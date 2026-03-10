@@ -1755,8 +1755,8 @@ Update task checkboxes as phases are completed. This file is the single source o
 | Phase 0 — Bootstrap | ✅ Complete | 2026-03-10 |
 | Phase 1 — Infrastructure | ✅ Complete | 2026-03-10 |
 | Phase 2 — Acquisition | ✅ Complete | 2026-03-10 |
-| Phase 3 — Intelligence Pipeline | ⬜ Not started | — |
-| Phase 4 — Chunking & Embedding | ⬜ Not started | — |
+| Phase 3 — Intelligence Pipeline | ✅ Complete | 2026-03-10 |
+| Phase 4 — Chunking & Embedding | ✅ Complete | 2026-03-10 |
 | Phase 5 — PG Structured Data | ⬜ Not started | — |
 | Phase 6 — Orchestrator & Cutover | ⬜ Not started | — |
 | Phase 7 — Structured MCP Tools | ⬜ Not started | — |
