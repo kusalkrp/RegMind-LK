@@ -1,0 +1,29 @@
+# Local development overrides — NOT for production.
+# Adds a 'dev' bridge network so services are reachable from the host.
+# Applied automatically by docker compose.
+
+services:
+  postgres:
+    networks:
+      - internal
+      - dev
+    ports:
+      - "5432:5432"
+
+  qdrant:
+    networks:
+      - internal
+      - dev
+    ports:
+      - "6333:6333"
+
+  sltda-mcp:
+    networks:
+      - internal
+      - dev
+    ports:
+      - "8001:8001"
+
+networks:
+  dev:
+    driver: bridge

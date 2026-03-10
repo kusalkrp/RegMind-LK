@@ -1,0 +1,91 @@
+# Format Strategies — maps format_family → extraction configuration
+# Modify this file to add new format families; no changes to pipeline.py required.
+
+format_strategies:
+
+  checklist_form:
+    extractor: ChecklistExtractor
+    output_table: registration_steps
+    chunk_strategy: list_aware        # never split numbered lists
+    structured_extraction: true
+    table_extraction: false
+
+  registration_steps:
+    extractor: StepsExtractor
+    output_table: registration_steps
+    chunk_strategy: list_aware
+    structured_extraction: true
+    table_extraction: false
+
+  gazette_legal:
+    extractor: GazetteExtractor
+    output_table: document_sections
+    chunk_strategy: clause_aware      # split on clause/section boundaries
+    structured_extraction: false
+    table_extraction: true
+
+  legislation:
+    extractor: LegislationExtractor
+    output_table: document_sections
+    chunk_strategy: section_aware     # split on numbered sections
+    structured_extraction: false
+    table_extraction: false
+
+  niche_toolkit:
+    extractor: ToolkitExtractor
+    output_table: niche_toolkits
+    chunk_strategy: heading_aware
+    structured_extraction: true       # Gemini summary generation
+    table_extraction: false
+    min_confidence: 0.85              # skip Gemini summary below this
+
+  data_table_report:
+    extractor: DataTableExtractor
+    output_table: document_sections
+    chunk_strategy: table_per_chunk
+    structured_extraction: true
+    table_extraction: true
+
+  annual_report:
+    extractor: AnnualReportExtractor
+    output_table: document_sections
+    chunk_strategy: heading_aware
+    structured_extraction: false
+    table_extraction: true
+
+  financial_circular:
+    extractor: CircularExtractor
+    output_table: financial_concessions
+    chunk_strategy: paragraph_aware
+    structured_extraction: true
+    table_extraction: true
+
+  strategic_plan:
+    extractor: NarrativeExtractor
+    output_table: document_sections
+    chunk_strategy: heading_aware
+    structured_extraction: false
+    table_extraction: false
+
+  registration_form_blank:
+    extractor: FormExtractor
+    output_table: document_sections
+    chunk_strategy: paragraph_aware
+    structured_extraction: false
+    table_extraction: false
+
+  guidelines_narrative:
+    extractor: NarrativeExtractor
+    output_table: document_sections
+    chunk_strategy: paragraph_aware
+    structured_extraction: false
+    table_extraction: false
+
+  unknown:
+    extractor: FallbackExtractor
+    output_table: document_sections
+    chunk_strategy: paragraph_aware
+    structured_extraction: false
+    table_extraction: false
+    flag_for_review: true
+    alert: true

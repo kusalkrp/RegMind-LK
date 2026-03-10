@@ -205,3 +205,19 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# sltda-mcp project
+.env
+documents/raw/
+documents/parsed/
+documents/chunks/
+# Keep .gitkeep files but ignore actual document content
+!documents/raw/.gitkeep
+!documents/parsed/.gitkeep
+!documents/chunks/.gitkeep
+!documents/manifests/.gitkeep
+backups/postgres/*.sql
+.claude/
+CLAUDE.md
+backups/qdrant/*.snapshot
+
