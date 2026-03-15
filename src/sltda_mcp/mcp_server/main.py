@@ -2,18 +2,25 @@
 FastMCP Server — sltda-mcp.
 Registers all 14 tools across 6 clusters.
 SSE transport on port 8001.
+
+Observability:
+- Per-tool rolling 60-second rate limit warning (≥60 calls → log warning)
+- Fire-and-forget invocation logging with latency to tool_invocation_log table
 """
 
+import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Literal
 
 from fastmcp import FastMCP
 
 from sltda_mcp.config import get_settings
+from sltda_mcp.database import acquire, close_pool, init_pool
 from sltda_mcp.logging_config import configure_json_logging
-from sltda_mcp.database import close_pool, init_pool
 from sltda_mcp.mcp_server.health import health_check
+from sltda_mcp.mcp_server.tools.base import log_invocation
 from sltda_mcp.mcp_server.tools.financial import (
     get_financial_concessions,
     get_tax_rate,
@@ -44,6 +51,53 @@ from sltda_mcp.qdrant_client import close_client, init_client, warmup_query
 
 logger = logging.getLogger(__name__)
 
+# ── Rate limiter state ─────────────────────────────────────────────────────────
+_tool_call_counts: dict[str, list[float]] = {}
+_RATE_LIMIT_WINDOW_SECONDS = 60.0
+_RATE_LIMIT_WARN_THRESHOLD = 60
+
+
+def _check_rate_limit(tool_name: str) -> None:
+    """
+    Track calls per tool in a rolling 60-second window.
+    Logs a warning if ≥60 calls are observed (warn-only, does not block).
+    """
+    now = time.monotonic()
+    window_start = now - _RATE_LIMIT_WINDOW_SECONDS
+    calls = _tool_call_counts.get(tool_name, [])
+    calls = [t for t in calls if t >= window_start]
+    calls.append(now)
+    _tool_call_counts[tool_name] = calls
+    if len(calls) >= _RATE_LIMIT_WARN_THRESHOLD:
+        logger.warning(
+            "rate_limit_warning",
+            extra={"tool_name": tool_name, "calls_in_window": len(calls)},
+        )
+
+
+async def _fire_log(
+    tool_name: str,
+    input_params: dict,
+    result_status: str,
+    latency_ms: float,
+    source_type: str,
+) -> None:
+    """Acquire a DB connection and write the invocation log. Never raises."""
+    try:
+        async with acquire() as conn:
+            await log_invocation(
+                conn,
+                tool_name=tool_name,
+                input_params=input_params,
+                result_status=result_status,
+                latency_ms=latency_ms,
+                source_type=source_type,
+            )
+    except Exception as exc:
+        logger.warning("_fire_log failed (non-critical): %s", exc)
+
+
+# ── Lifespan ───────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
 async def _lifespan(app: FastMCP) -> AsyncIterator[None]:  # type: ignore[type-arg]
@@ -73,6 +127,7 @@ mcp = FastMCP(
     lifespan=_lifespan,
 )
 
+
 # ── Cluster 1 — Registration & Compliance ─────────────────────────────────────
 
 @mcp.tool()
@@ -89,7 +144,18 @@ async def registration_requirements(
     Do NOT use this for standards or legal classifications — use
     accommodation_standards instead.
     """
-    return await get_registration_requirements(business_type, action, language)
+    _check_rate_limit("registration_requirements")
+    start = time.monotonic()
+    result = await get_registration_requirements(business_type, action, language)
+    latency_ms = (time.monotonic() - start) * 1000
+    asyncio.create_task(_fire_log(
+        "registration_requirements",
+        {"business_type": business_type, "action": action, "language": language},
+        result.get("status", "success"),
+        latency_ms,
+        result.get("source", {}).get("type", "database"),
+    ))
+    return result
 
 
 @mcp.tool()
@@ -104,7 +170,18 @@ async def accommodation_standards(
     Use this for standards and legal classifications.
     For the step-by-step registration process, use registration_requirements instead.
     """
-    return await get_accommodation_standards(category, detail_level)
+    _check_rate_limit("accommodation_standards")
+    start = time.monotonic()
+    result = await get_accommodation_standards(category, detail_level)
+    latency_ms = (time.monotonic() - start) * 1000
+    asyncio.create_task(_fire_log(
+        "accommodation_standards",
+        {"category": category, "detail_level": detail_level},
+        result.get("status", "success"),
+        latency_ms,
+        result.get("source", {}).get("type", "database"),
+    ))
+    return result
 
 
 @mcp.tool()
@@ -119,7 +196,18 @@ async def registration_checklist(
     Call this when a user asks WHAT DOCUMENTS are needed.
     For the full registration process with fees and steps, use registration_requirements.
     """
-    return await get_registration_checklist(business_type, checklist_type)
+    _check_rate_limit("registration_checklist")
+    start = time.monotonic()
+    result = await get_registration_checklist(business_type, checklist_type)
+    latency_ms = (time.monotonic() - start) * 1000
+    asyncio.create_task(_fire_log(
+        "registration_checklist",
+        {"business_type": business_type, "checklist_type": checklist_type},
+        result.get("status", "success"),
+        latency_ms,
+        result.get("source", {}).get("type", "database"),
+    ))
+    return result
 
 
 # ── Cluster 2 — Financial & Tax ───────────────────────────────────────────────
@@ -136,7 +224,18 @@ async def financial_concessions(
     Call this for financial benefits, concessionary loans, or banking facilities.
     For tax rates specifically, use tax_rate instead.
     """
-    return await get_financial_concessions(business_type, concession_type)
+    _check_rate_limit("financial_concessions")
+    start = time.monotonic()
+    result = await get_financial_concessions(business_type, concession_type)
+    latency_ms = (time.monotonic() - start) * 1000
+    asyncio.create_task(_fire_log(
+        "financial_concessions",
+        {"business_type": business_type, "concession_type": concession_type},
+        result.get("status", "success"),
+        latency_ms,
+        result.get("source", {}).get("type", "database"),
+    ))
+    return result
 
 
 @mcp.tool()
@@ -152,7 +251,18 @@ async def tdl_information(
     Call this for any question about TDL — what it is, the rate, how to get
     clearance, or what documents are needed for clearance.
     """
-    return await get_tdl_information(query_type)
+    _check_rate_limit("tdl_information")
+    start = time.monotonic()
+    result = await get_tdl_information(query_type)
+    latency_ms = (time.monotonic() - start) * 1000
+    asyncio.create_task(_fire_log(
+        "tdl_information",
+        {"query_type": query_type},
+        result.get("status", "success"),
+        latency_ms,
+        result.get("source", {}).get("type", "database"),
+    ))
+    return result
 
 
 @mcp.tool()
@@ -165,7 +275,18 @@ async def tax_rate(
     Call this for tax rates, tax exemptions, or income tax concessions.
     For broader financial concessions (loans, moratoriums), use financial_concessions.
     """
-    return await get_tax_rate(business_type)
+    _check_rate_limit("tax_rate")
+    start = time.monotonic()
+    result = await get_tax_rate(business_type)
+    latency_ms = (time.monotonic() - start) * 1000
+    asyncio.create_task(_fire_log(
+        "tax_rate",
+        {"business_type": business_type},
+        result.get("status", "success"),
+        latency_ms,
+        result.get("source", {}).get("type", "database"),
+    ))
+    return result
 
 
 # ── Cluster 3 — Statistics & Reports ─────────────────────────────────────────
@@ -182,7 +303,18 @@ async def latest_arrivals_report(
     or accommodation occupancy data.
     For full SLTDA annual reports (financials + strategy), use annual_report.
     """
-    return await get_latest_arrivals_report(report_type, year)
+    _check_rate_limit("latest_arrivals_report")
+    start = time.monotonic()
+    result = await get_latest_arrivals_report(report_type, year)
+    latency_ms = (time.monotonic() - start) * 1000
+    asyncio.create_task(_fire_log(
+        "latest_arrivals_report",
+        {"report_type": report_type, "year": year},
+        result.get("status", "success"),
+        latency_ms,
+        result.get("source", {}).get("type", "database"),
+    ))
+    return result
 
 
 @mcp.tool()
@@ -197,7 +329,18 @@ async def annual_report(
     or audited financial statements for a given year.
     For tourist arrival statistics only, use latest_arrivals_report.
     """
-    return await get_annual_report(year, language)
+    _check_rate_limit("annual_report")
+    start = time.monotonic()
+    result = await get_annual_report(year, language)
+    latency_ms = (time.monotonic() - start) * 1000
+    asyncio.create_task(_fire_log(
+        "annual_report",
+        {"year": year, "language": language},
+        result.get("status", "success"),
+        latency_ms,
+        result.get("source", {}).get("type", "database"),
+    ))
+    return result
 
 
 # ── Cluster 4 — Strategy & Policy ────────────────────────────────────────────
@@ -212,7 +355,18 @@ async def strategic_plan(
     Call this for strategic goals, tourism targets, and policy direction.
     For legal provisions of the Tourism Act, use tourism_act_provisions instead.
     """
-    return await get_strategic_plan(query, section_focus)
+    _check_rate_limit("strategic_plan")
+    start = time.monotonic()
+    result = await get_strategic_plan(query, section_focus)
+    latency_ms = (time.monotonic() - start) * 1000
+    asyncio.create_task(_fire_log(
+        "strategic_plan",
+        {"query": query, "section_focus": section_focus},
+        result.get("status", "success"),
+        latency_ms,
+        result.get("source", {}).get("type", "rag"),
+    ))
+    return result
 
 
 @mcp.tool()
@@ -224,7 +378,18 @@ async def tourism_act_provisions(
     Call this for legal provisions, definitions, offences, and regulatory powers.
     For policy goals, use strategic_plan instead.
     """
-    return await get_tourism_act_provisions(topic)
+    _check_rate_limit("tourism_act_provisions")
+    start = time.monotonic()
+    result = await get_tourism_act_provisions(topic)
+    latency_ms = (time.monotonic() - start) * 1000
+    asyncio.create_task(_fire_log(
+        "tourism_act_provisions",
+        {"topic": topic},
+        result.get("status", "success"),
+        latency_ms,
+        result.get("source", {}).get("type", "rag"),
+    ))
+    return result
 
 
 # ── Cluster 5 — Niche Tourism ────────────────────────────────────────────────
@@ -237,7 +402,18 @@ async def niche_categories(
     List all SLTDA-recognised niche tourism categories (eco, MICE, adventure, etc.).
     Use this to discover available categories before drilling in with niche_toolkit.
     """
-    return await get_niche_categories(filter)
+    _check_rate_limit("niche_categories")
+    start = time.monotonic()
+    result = await get_niche_categories(filter)
+    latency_ms = (time.monotonic() - start) * 1000
+    asyncio.create_task(_fire_log(
+        "niche_categories",
+        {"filter": filter},
+        result.get("status", "success"),
+        latency_ms,
+        result.get("source", {}).get("type", "database"),
+    ))
+    return result
 
 
 @mcp.tool()
@@ -250,7 +426,18 @@ async def niche_toolkit(
     Summary mode: fast DB lookup. Full mode: DB + AI-synthesised document detail.
     Use niche_categories first to find the correct category code.
     """
-    return await get_niche_toolkit(category, detail_level)
+    _check_rate_limit("niche_toolkit")
+    start = time.monotonic()
+    result = await get_niche_toolkit(category, detail_level)
+    latency_ms = (time.monotonic() - start) * 1000
+    asyncio.create_task(_fire_log(
+        "niche_toolkit",
+        {"category": category, "detail_level": detail_level},
+        result.get("status", "success"),
+        latency_ms,
+        result.get("source", {}).get("type", "database"),
+    ))
+    return result
 
 
 # ── Cluster 6 — Investor & Discovery ─────────────────────────────────────────
@@ -263,7 +450,18 @@ async def investment_process(
     Get the investment process for starting a tourism business in Sri Lanka.
     Call this when an investor asks how to establish or get approval for a tourism project.
     """
-    return await get_investment_process(project_type)
+    _check_rate_limit("investment_process")
+    start = time.monotonic()
+    result = await get_investment_process(project_type)
+    latency_ms = (time.monotonic() - start) * 1000
+    asyncio.create_task(_fire_log(
+        "investment_process",
+        {"project_type": project_type},
+        result.get("status", "success"),
+        latency_ms,
+        result.get("source", {}).get("type", "hybrid"),
+    ))
+    return result
 
 
 @mcp.tool()
@@ -278,7 +476,19 @@ async def search_resources(
     Use specific tools when intent is clear — they are faster and more accurate.
     Top_k is capped at 7.
     """
-    return await search_sltda_resources(query, section_filter, document_type_filter, top_k)
+    _check_rate_limit("search_resources")
+    start = time.monotonic()
+    result = await search_sltda_resources(query, section_filter, document_type_filter, top_k)
+    latency_ms = (time.monotonic() - start) * 1000
+    asyncio.create_task(_fire_log(
+        "search_resources",
+        {"query": query, "section_filter": section_filter,
+         "document_type_filter": document_type_filter, "top_k": top_k},
+        result.get("status", "success"),
+        latency_ms,
+        result.get("source", {}).get("type", "rag"),
+    ))
+    return result
 
 
 # ── Health (non-MCP HTTP endpoint) ────────────────────────────────────────────
@@ -293,7 +503,6 @@ async def server_health() -> dict[str, Any]:
 
 
 if __name__ == "__main__":
-    settings = get_settings()
     mcp.run(
         transport="sse",
         host="0.0.0.0",

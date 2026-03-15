@@ -27,11 +27,8 @@ logger = logging.getLogger(__name__)
 
 _START_TIME = time.monotonic()
 
-# Pool availability threshold: < 20% free → degraded
 _POOL_FREE_THRESHOLD = 0.20
-# Disk usage threshold: > 80% → degraded (Issue #19)
 _DISK_WARN_THRESHOLD = 80.0
-# Cutover states that indicate an incomplete operation → degraded
 _INCOMPLETE_CUTOVER_STATES = {"qdrant_done", "postgres_done"}
 
 
@@ -53,7 +50,6 @@ async def health_check() -> dict:
         components["postgres"] = {"status": "connected", **stats}
         pg_ok = True
 
-        # Pool availability check
         total = stats.get("pool_size", 1)
         free = stats.get("pool_free", total)
         if total > 0 and (free / total) < _POOL_FREE_THRESHOLD:
@@ -70,7 +66,6 @@ async def health_check() -> dict:
         client = get_client()
         collections = await client.get_collections()
         names = [c.name for c in collections.collections]
-        # Count vectors in live collection
         try:
             info = await client.get_collection(settings.qdrant_collection)
             total_vectors = info.points_count or 0
@@ -85,7 +80,6 @@ async def health_check() -> dict:
     # ── Gemini API ────────────────────────────────────────────────────────────
     try:
         genai.configure(api_key=settings.gemini_api_key)
-        # Lightweight probe: list models (no quota consumed)
         models = list(genai.list_models())
         components["gemini_api"] = {"status": "reachable", "model_count": len(models)}
     except Exception as exc:
@@ -150,6 +144,34 @@ async def health_check() -> dict:
         except Exception:
             pass  # non-critical metadata
 
+    # ── Invocation stats (last 24 h) ──────────────────────────────────────────
+    invocation_stats: dict = {}
+    if pg_ok:
+        try:
+            async with acquire() as conn:
+                summary = await conn.fetchrow(
+                    """SELECT COUNT(*) AS total_calls,
+                              COUNT(*) FILTER (WHERE result_status = 'error') AS error_calls
+                       FROM tool_invocation_log
+                       WHERE called_at > NOW() - INTERVAL '24 hours'"""
+                )
+                top_row = await conn.fetchrow(
+                    """SELECT tool_name, COUNT(*) AS call_count
+                       FROM tool_invocation_log
+                       WHERE called_at > NOW() - INTERVAL '24 hours'
+                       GROUP BY tool_name
+                       ORDER BY call_count DESC
+                       LIMIT 1"""
+                )
+            invocation_stats = {
+                "last_24h_calls": int(summary["total_calls"]) if summary else 0,
+                "last_24h_errors": int(summary["error_calls"]) if summary else 0,
+                "top_tool": top_row["tool_name"] if top_row else None,
+                "top_tool_calls": int(top_row["call_count"]) if top_row else 0,
+            }
+        except Exception:
+            invocation_stats = {"error": "stats_unavailable"}
+
     # ── Assemble response ─────────────────────────────────────────────────────
     uptime = int(time.monotonic() - _START_TIME)
 
@@ -167,6 +189,7 @@ async def health_check() -> dict:
         "pool_total": components.get("postgres", {}).get("pool_size"),
         "memory_rss_mb": memory_rss_mb,
         "disk_usage_percent": components.get("disk", {}).get("percent"),
+        "invocation_stats": invocation_stats,
     }
 
 
