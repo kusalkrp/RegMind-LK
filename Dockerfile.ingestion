@@ -12,11 +12,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     default-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 
+# Copy source before editable install so setuptools can resolve the package
 COPY pyproject.toml .
+COPY src/ ./src/
+COPY ingestion/ ./ingestion/
 RUN pip install --no-cache-dir -e ".[dev]"
 
-COPY --chown=appuser:appuser src/ ./src/
-COPY --chown=appuser:appuser ingestion/ ./ingestion/
+RUN chown -R appuser:appuser /app
 
 USER appuser
 

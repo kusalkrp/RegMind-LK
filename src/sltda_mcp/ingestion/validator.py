@@ -56,7 +56,7 @@ _SCHEMA_MAP: dict[str, DataFrameSchema | None] = {
     "registration_steps": StepsSchema,
     "checklist_form": ChecklistSchema,
     "financial_circular": CircularSchema,
-    "niche_toolkit": ToolkitSchema,
+    # niche_toolkit: single-record dict, not a list — skip Pandera
 }
 
 

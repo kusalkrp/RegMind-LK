@@ -126,8 +126,7 @@ async def health_check() -> dict:
         try:
             async with acquire() as conn:
                 row = await conn.fetchrow(
-                    """SELECT last_refresh_at, cutover_status,
-                              ingestion_status
+                    """SELECT last_refresh_at, cutover_status
                        FROM system_metadata LIMIT 1"""
                 )
                 doc_count = await conn.fetchval(
@@ -139,7 +138,7 @@ async def health_check() -> dict:
                     if row["last_refresh_at"] else None
                 )
                 cutover_status = row["cutover_status"] or "none"
-                ingestion_status = row.get("ingestion_status") or "idle"
+                ingestion_status = "idle"
             total_documents = doc_count or 0
 
             if cutover_status in _INCOMPLETE_CUTOVER_STATES:

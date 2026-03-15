@@ -18,7 +18,7 @@ from sltda_mcp.ingestion.chunker import Chunk
 logger = logging.getLogger(__name__)
 
 STAGING_COLLECTION = "sltda_documents_next"
-VECTOR_SIZE = 768
+VECTOR_SIZE = 3072
 _ID_NAMESPACE = UUID("12345678-1234-5678-1234-567812345678")
 
 
@@ -83,7 +83,11 @@ def upsert_chunks(
         for chunk, embedding in chunks_with_embeddings
     ]
 
-    client.upsert(collection_name=STAGING_COLLECTION, points=points, wait=True)
+    batch_size = 200
+    for i in range(0, len(points), batch_size):
+        batch = points[i : i + batch_size]
+        client.upsert(collection_name=STAGING_COLLECTION, points=batch, wait=True)
+        logger.debug("Qdrant upsert: batch %d–%d done", i, i + len(batch) - 1)
     logger.info("Qdrant upsert: %d points upserted to %s", len(points), STAGING_COLLECTION)
 
     actual = client.count(collection_name=STAGING_COLLECTION).count

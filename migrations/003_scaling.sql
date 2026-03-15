@@ -75,13 +75,12 @@ CREATE TABLE IF NOT EXISTS tool_invocation_log_2026_12
 CREATE INDEX IF NOT EXISTS idx_invlog_tool_called
     ON tool_invocation_log(tool_name, called_at DESC);
 
--- Step 5: Migrate recent legacy data
+-- Step 5: Migrate recent legacy data (id excluded — legacy used UUID, new table uses BIGSERIAL)
 INSERT INTO tool_invocation_log
-    (id, tool_name, input_params, result_status, response_time_ms, called_at)
-SELECT id, tool_name, input_params, result_status, response_time_ms, called_at
+    (tool_name, input_params, result_status, response_time_ms, called_at)
+SELECT tool_name, input_params, result_status, response_time_ms, called_at
 FROM tool_invocation_log_legacy
-WHERE called_at >= '2026-01-01'
-ON CONFLICT DO NOTHING;
+WHERE called_at >= '2026-01-01';
 
 -- Step 6: Function to auto-create next month's partition
 -- Call this monthly via pg_cron: SELECT cron.schedule('0 0 25 * *', 'SELECT create_next_invlog_partition()');

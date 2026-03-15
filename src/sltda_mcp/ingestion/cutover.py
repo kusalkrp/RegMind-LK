@@ -9,9 +9,11 @@ import logging
 from datetime import datetime, timezone
 
 import asyncpg
+from qdrant_client import AsyncQdrantClient
+from qdrant_client.http import models as qdrant_models
 
+from sltda_mcp.config import get_settings
 from sltda_mcp.exceptions import CutoverError
-from sltda_mcp.qdrant_client import reassign_alias
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,23 @@ async def _set_cutover_status(conn: asyncpg.Connection, status: str) -> None:
     )
 
 
+async def _reassign_alias(
+    client: AsyncQdrantClient, alias_name: str, target_collection: str
+) -> None:
+    """Atomically reassign a Qdrant alias to a new collection."""
+    await client.update_collection_aliases(
+        change_aliases_operations=[
+            qdrant_models.CreateAliasOperation(
+                create_alias=qdrant_models.CreateAlias(
+                    collection_name=target_collection,
+                    alias_name=alias_name,
+                )
+            )
+        ]
+    )
+    logger.info("Qdrant alias '%s' → '%s'", alias_name, target_collection)
+
+
 async def execute_cutover(conn: asyncpg.Connection) -> None:
     """
     Perform atomic blue/green cutover.
@@ -47,9 +66,12 @@ async def execute_cutover(conn: asyncpg.Connection) -> None:
     2. PG rename transaction (all tables in one BEGIN/COMMIT)
     3. Update system_metadata: complete + rollback window
     """
+    settings = get_settings()
+    qdrant = AsyncQdrantClient(url=settings.qdrant_url)
+
     logger.info("Cutover: step 1 — reassigning Qdrant alias")
     try:
-        await reassign_alias(LIVE_ALIAS, STAGING_COLLECTION)
+        await _reassign_alias(qdrant, LIVE_ALIAS, STAGING_COLLECTION)
     except Exception as exc:
         raise CutoverError(f"Qdrant alias reassignment failed: {exc}") from exc
 
@@ -86,7 +108,7 @@ async def execute_cutover(conn: asyncpg.Connection) -> None:
         # PG failed — try to reverse the Qdrant alias
         logger.error("PG rename failed; attempting Qdrant alias rollback: %s", exc)
         try:
-            await reassign_alias(LIVE_ALIAS, PREVIOUS_COLLECTION)
+            await _reassign_alias(qdrant, LIVE_ALIAS, PREVIOUS_COLLECTION)
             logger.info("Qdrant alias reverted to %s", PREVIOUS_COLLECTION)
         except Exception as revert_exc:
             logger.critical(
@@ -113,8 +135,11 @@ async def execute_rollback(conn: asyncpg.Connection) -> None:
     """
     logger.warning("Rolling back cutover — restoring previous data set")
 
+    settings = get_settings()
+    qdrant = AsyncQdrantClient(url=settings.qdrant_url)
+
     try:
-        await reassign_alias(LIVE_ALIAS, PREVIOUS_COLLECTION)
+        await _reassign_alias(qdrant, LIVE_ALIAS, PREVIOUS_COLLECTION)
     except Exception as exc:
         raise CutoverError(f"Qdrant alias rollback failed: {exc}") from exc
 

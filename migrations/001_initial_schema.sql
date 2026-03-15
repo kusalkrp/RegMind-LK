@@ -206,18 +206,13 @@ CREATE TABLE arrivals_data_staging (LIKE arrivals_data INCLUDING ALL);
 -- ─── Pipeline state ──────────────────────────────────────────────────────────
 
 CREATE TABLE pipeline_state (
-    id                  SERIAL PRIMARY KEY,
-    run_id              UUID NOT NULL DEFAULT gen_random_uuid(),
-    started_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    completed_at        TIMESTAMPTZ,
-    last_embedded_chunk_id VARCHAR(255),  -- checkpoint for resume
-    status              VARCHAR(30) NOT NULL DEFAULT 'running',
-    docs_total          INTEGER,
-    docs_downloaded     INTEGER,
-    docs_parsed         INTEGER,
-    docs_embedded       INTEGER,
-    docs_failed         INTEGER,
-    error_message       TEXT
+    id          SERIAL PRIMARY KEY,
+    run_id      UUID NOT NULL,
+    step        INTEGER NOT NULL,
+    status      VARCHAR(30) NOT NULL DEFAULT 'running',
+    details     TEXT NOT NULL DEFAULT '',
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (run_id, step)
 );
 
 -- ─── System metadata ─────────────────────────────────────────────────────────

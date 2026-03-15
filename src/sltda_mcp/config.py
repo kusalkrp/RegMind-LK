@@ -17,7 +17,7 @@ class Settings(BaseSettings):
 
     # AI
     gemini_api_key: str
-    gemini_embedding_model: str = "models/text-embedding-004"
+    gemini_embedding_model: str = "models/gemini-embedding-001"
     gemini_synthesis_model: str = "gemini-1.5-flash"
 
     # MCP Server

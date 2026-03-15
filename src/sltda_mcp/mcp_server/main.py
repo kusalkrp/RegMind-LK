@@ -11,10 +11,13 @@ Observability:
 import asyncio
 import logging
 import time
-from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, Literal
+from typing import Any, Literal
 
+import uvicorn
 from fastmcp import FastMCP
+from starlette.middleware import Middleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from sltda_mcp.config import get_settings
 from sltda_mcp.database import acquire, close_pool, init_pool
@@ -105,36 +108,6 @@ async def _fire_log(
         logger.warning("_fire_log failed (non-critical): %s", exc)
 
 
-# ── Lifespan ───────────────────────────────────────────────────────────────────
-
-@asynccontextmanager
-async def _lifespan(app: FastMCP) -> AsyncIterator[None]:  # type: ignore[type-arg]
-    settings = get_settings()
-    configure_json_logging(settings.log_level)
-
-    # Attach API key authentication to the FastMCP Starlette app
-    try:
-        if hasattr(app, 'app'):
-            app.app.add_middleware(ApiKeyMiddleware)
-        elif hasattr(app, '_app'):
-            app._app.add_middleware(ApiKeyMiddleware)
-        logger.info("ApiKeyMiddleware attached")
-    except Exception as exc:
-        logger.warning("Could not attach ApiKeyMiddleware (check FastMCP version): %s", exc)
-
-    logger.info("sltda-mcp starting up")
-    await init_pool()
-    await init_client()
-    await warmup_query(settings.qdrant_collection)
-    logger.info("sltda-mcp ready")
-
-    yield
-
-    logger.info("sltda-mcp shutting down")
-    await close_pool()
-    await close_client()
-
-
 mcp = FastMCP(
     "sltda-mcp",
     instructions=(
@@ -142,7 +115,6 @@ mcp = FastMCP(
         "Covers business registration, financial concessions, tourist statistics, "
         "strategic plans, niche tourism toolkits, and investor guidance."
     ),
-    lifespan=_lifespan,
 )
 
 
@@ -520,9 +492,34 @@ async def server_health() -> dict[str, Any]:
     return await health_check()
 
 
+@mcp.custom_route("/health", methods=["GET"])
+async def http_health(request: Request) -> JSONResponse:
+    """HTTP GET /health — used by Docker healthcheck and load balancers."""
+    result = await health_check()
+    status_code = 200 if result.get("status") == "healthy" else 503
+    return JSONResponse(result, status_code=status_code)
+
+
 if __name__ == "__main__":
-    mcp.run(
-        transport="sse",
-        host="0.0.0.0",
-        port=8001,
-    )
+    settings = get_settings()
+    configure_json_logging(settings.log_level)
+
+    # Build the Starlette app with ApiKeyMiddleware injected directly
+    app = mcp.http_app(transport="sse", middleware=[Middleware(ApiKeyMiddleware)])
+
+    async def _startup() -> None:
+        logger.info("sltda-mcp starting up")
+        await init_pool()
+        await init_client()
+        await warmup_query(settings.qdrant_collection)
+        logger.info("sltda-mcp ready")
+
+    async def _shutdown() -> None:
+        logger.info("sltda-mcp shutting down")
+        await close_pool()
+        await close_client()
+
+    app.add_event_handler("startup", _startup)
+    app.add_event_handler("shutdown", _shutdown)
+
+    uvicorn.run(app, host="0.0.0.0", port=8001, lifespan="on")

@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 _client: AsyncQdrantClient | None = None
 
-VECTOR_DIMENSIONS = 768
+VECTOR_DIMENSIONS = 3072
 DISTANCE_METRIC = qdrant_models.Distance.COSINE
 
 

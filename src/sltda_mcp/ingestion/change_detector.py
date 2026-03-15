@@ -4,6 +4,7 @@ Compares the candidate document list against the previous manifest
 to determine which documents are new, modified, unchanged, or removed.
 Only new/modified documents need re-ingestion.
 """
+from __future__ import annotations
 
 import json
 import logging
@@ -56,15 +57,16 @@ def _build_manifest_index(manifest: dict) -> dict[str, dict]:
 
 
 def detect_changes(
-    download_results: list[DownloadResult],
+    candidates: list[CandidateDocument],
     manifests_dir: Path | None = None,
 ) -> tuple[list[DocumentChange], list[DocumentChange]]:
     """
-    Compare downloaded documents against the previous manifest.
+    Compare candidate URL list against the previous manifest (URL-based).
+    Downloads happen after this call; content hash comparison is deferred.
 
     Returns:
-        changed: list of DocumentChange with type NEW or MODIFIED — need ingestion
-        removed: list of DocumentChange with type REMOVED — mark inactive in DB
+        changed: DocumentChange list with type NEW — need ingestion
+        removed: DocumentChange list with type REMOVED — mark inactive in DB
     """
     settings = get_settings()
     base = Path(settings.documents_base_path)
@@ -77,39 +79,23 @@ def detect_changes(
     unchanged_count = 0
     current_urls: set[str] = set()
 
-    for result in download_results:
-        if result.status != DownloadStatus.SUCCESS:
-            continue
-
-        url = result.candidate.source_url
+    for candidate in candidates:
+        url = candidate.source_url
         current_urls.add(url)
-        current_hash = result.content_hash
         prev_entry = previous_index.get(url)
 
         if prev_entry is None:
-            # Brand new document
             changed.append(DocumentChange(
-                candidate=result.candidate,
+                candidate=candidate,
                 change_type=ChangeType.NEW,
                 previous_hash=None,
-                current_hash=current_hash,
-                local_path=str(result.local_path),
-                file_size_kb=result.file_size_kb,
-            ))
-        elif prev_entry.get("sha256") != current_hash:
-            # Hash changed — document was updated
-            changed.append(DocumentChange(
-                candidate=result.candidate,
-                change_type=ChangeType.MODIFIED,
-                previous_hash=prev_entry.get("sha256"),
-                current_hash=current_hash,
-                local_path=str(result.local_path),
-                file_size_kb=result.file_size_kb,
+                current_hash=None,
+                local_path=None,
             ))
         else:
             unchanged_count += 1
 
-    # Detect removed documents (in previous manifest but not in current candidate list)
+    # Detect removed documents (in previous manifest but no longer scraped)
     removed: list[DocumentChange] = []
     for url, entry in previous_index.items():
         if url not in current_urls:
@@ -122,9 +108,8 @@ def detect_changes(
             ))
 
     logger.info(
-        "Change detection: %d new, %d modified, %d unchanged, %d removed",
-        sum(1 for c in changed if c.change_type == ChangeType.NEW),
-        sum(1 for c in changed if c.change_type == ChangeType.MODIFIED),
+        "Change detection: %d new, %d unchanged, %d removed",
+        len(changed),
         unchanged_count,
         len(removed),
     )
@@ -133,8 +118,8 @@ def detect_changes(
 
 def write_manifest(
     download_results: list[DownloadResult],
-    run_id: str | None = None,
     manifests_dir: Path | None = None,
+    run_id: str | None = None,
 ) -> Path:
     """
     Write a new manifest file for this ingestion run.

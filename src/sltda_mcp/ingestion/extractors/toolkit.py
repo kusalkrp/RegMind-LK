@@ -73,12 +73,14 @@ class ToolkitExtractor(BaseExtractor):
         return ExtractionResult(
             text=full_text,
             structured_data={
-                "toolkit_code": toolkit_code,
-                "toolkit_name": toolkit_name,
-                "target_market": "",
-                "key_activities": [],
-                "regulatory_notes": "",
-                "summary": summary,
+                "toolkit": {
+                    "toolkit_code": toolkit_code,
+                    "toolkit_name": toolkit_name,
+                    "target_market": "",
+                    "key_activities": [],
+                    "regulatory_notes": "",
+                    "summary": summary,
+                }
             },
             page_count=page_count,
             extraction_confidence="high" if token_count >= _TOKEN_THRESHOLD else "medium",

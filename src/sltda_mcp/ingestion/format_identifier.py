@@ -23,6 +23,21 @@ _ANNUAL_REPORT_RE = re.compile(r"annual.?report.?\d{4}", re.IGNORECASE)
 _MONTHLY_ARRIVALS_RE = re.compile(r"monthly.?arrival", re.IGNORECASE)
 _STRATEGIC_PLAN_RE = re.compile(r"strategic.?plan", re.IGNORECASE)
 
+# Tier 0: document-name keyword → format_family (ordered by specificity)
+_NAME_FORMAT_PATTERNS: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"gazette", re.I), "gazette_legal"),
+    (re.compile(r"banking.?circular|circular.?no", re.I), "financial_circular"),
+    (re.compile(r"toolkit", re.I), "niche_toolkit"),
+    (re.compile(r"(registration|renewal).{0,20}(process|step)", re.I), "registration_steps"),
+    (re.compile(r"check.?list", re.I), "checklist_form"),
+    (re.compile(r"tourism.?act|act.?no\.?\s*\d+", re.I), "legislation"),
+    (re.compile(r"strategic.?plan", re.I), "strategic_plan"),
+    (re.compile(r"annual.?report", re.I), "annual_report"),
+    (re.compile(r"monthly.?arrival|statistical.?report", re.I), "data_table_report"),
+    (re.compile(r"concession|moratorium|tax.?rate|financial.?relief", re.I), "financial_circular"),
+    (re.compile(r"clearance.?form|application.?form", re.I), "registration_form_blank"),
+]
+
 
 @dataclass
 class FeatureFingerprint:
@@ -122,6 +137,31 @@ def extract_features(pdf_path: Path) -> FeatureFingerprint:
     )
 
 
+def classify_tier0(
+    document_name: str,
+    section_id: int | None,
+    sections_config: dict,
+) -> FormatClassification | None:
+    """
+    Tier 0: classify using document link-text keywords and page section.
+    Most reliable — derived directly from the SLTDA website structure.
+    Returns None only if neither name patterns nor section defaults match.
+    """
+    # Name-pattern matching (ordered by specificity)
+    for pattern, family in _NAME_FORMAT_PATTERNS:
+        if pattern.search(document_name):
+            return FormatClassification(family, confidence=0.9, tier=1)
+
+    # Section-default fallback
+    if section_id is not None:
+        sec_cfg = sections_config.get(section_id) or sections_config.get(str(section_id), {})
+        default_family = sec_cfg.get("default_format_family")
+        if default_family:
+            return FormatClassification(default_family, confidence=0.75, tier=1)
+
+    return None
+
+
 def classify_tier1(features: FeatureFingerprint) -> FormatClassification | None:
     """Rule-based Tier 1 classification. Returns None if no rule matches (~75% of docs)."""
     fn = features.filename.lower()
@@ -174,21 +214,43 @@ async def identify_format(
     qdrant_search_fn: (
         Callable[[FeatureFingerprint], Awaitable[tuple[str, float]]] | None
     ) = None,
+    section_id: int | None = None,
+    document_name: str = "",
 ) -> tuple[FormatClassification, StrategyConfig]:
     """
     Classify a document's format and return its processing strategy.
 
-    Tier 1 (rule-based) runs first. If no rule matches, Tier 2 (embedding similarity)
-    is invoked via qdrant_search_fn. Unknown documents always get FallbackExtractor.
+    Tier 0 (document name + section): runs first — deterministic, from website structure.
+    Tier 1 (rule-based features): filename/PDF structural rules.
+    Tier 2 (embedding similarity): Qdrant exemplar search for ambiguous docs.
+    Unknown documents always get FallbackExtractor.
 
     Args:
         features: Pre-extracted FeatureFingerprint.
         qdrant_search_fn: Async callable returning (format_family, cosine_score).
+        section_id: Website section ID from the scraper (1–13).
+        document_name: Link text from the website (e.g. "Registration Process / Steps").
 
     Returns:
         (FormatClassification, StrategyConfig)
     """
-    classification = classify_tier1(features)
+    # Load section config for Tier 0
+    try:
+        import yaml as _yaml
+        with open(
+            Path(__file__).parents[3] / "ingestion" / "config" / "section_map.yaml"
+        ) as _f:
+            _section_cfg = _yaml.safe_load(_f).get("sections", {})
+    except Exception:
+        _section_cfg = {}
+
+    # Tier 0: document name + section-based classification
+    classification = classify_tier0(document_name, section_id, _section_cfg)
+
+    # Tier 1: rule-based filename/PDF features (overrides Tier 0 for high-confidence rules)
+    tier1 = classify_tier1(features)
+    if tier1 is not None:
+        classification = tier1
 
     if classification is None:
         if qdrant_search_fn is not None:
@@ -206,7 +268,7 @@ async def identify_format(
             classification = FormatClassification(
                 format_family="unknown", confidence=0.0, flag_for_review=True, tier=2
             )
-            logger.warning("No Qdrant search available — defaulting to unknown: %s", features.filename)
+            logger.warning("No Qdrant/section match — defaulting to unknown: %s", features.filename)
 
     strategy = load_strategy(classification.format_family)
     logger.info(

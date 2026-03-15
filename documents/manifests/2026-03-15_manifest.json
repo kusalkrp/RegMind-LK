@@ -1,0 +1,357 @@
+{
+  "generated_at": "2026-03-15",
+  "pipeline_run_id": "73ea5b37-3662-4522-a6a6-3f7488ae01ea",
+  "total_documents": 35,
+  "documents": [
+    {
+      "url": "https://sltda.gov.lk/storage/common_media/PDF%20add3592563699.pdf",
+      "filename": "PDF%20add3592563699.pdf",
+      "sha256": "7792aeacc94c70aafe535c236c8f2b29312ea74fbc6618a38c5106db3b17d90e",
+      "section_id": 1,
+      "section_name": "Registration & Renewal",
+      "document_name": "Mandatory Registration NoticeSinhala",
+      "file_size_kb": 139,
+      "local_path": "/app/documents/raw/section_01_registration/PDF%20add3592563699.pdf"
+    },
+    {
+      "url": "https://sltda.gov.lk/storage/common_media/ARE_YOU_A%20SERVICE_PROVIDER_Paper_Advertisment_2020_english2899360352.pdf",
+      "filename": "ARE_YOU_A%20SERVICE_PROVIDER_Paper_Advertisment_2020_english2899360352.pdf",
+      "sha256": "7c45a9b3b12bd604aa4a9477805fbca39e7f0a41e96d601933528fe62e28f35c",
+      "section_id": 1,
+      "section_name": "Registration & Renewal",
+      "document_name": "Mandatory Registration NoticeEnglish",
+      "file_size_kb": 448,
+      "local_path": "/app/documents/raw/section_01_registration/ARE_YOU_A%20SERVICE_PROVIDER_Paper_Advertisment_2020_english2899360352.pdf"
+    },
+    {
+      "url": "https://sltda.gov.lk/storage/common_media/payment-structure.pdf",
+      "filename": "payment-structure.pdf",
+      "sha256": "46d0e6d9752bc56507b48f470d3d34242fc8427818018d882b9d2695ae2c947a",
+      "section_id": 1,
+      "section_name": "Registration & Renewal",
+      "document_name": "Payment Structure for Tourist Establishments",
+      "file_size_kb": 111,
+      "local_path": "/app/documents/raw/section_01_registration/payment-structure.pdf"
+    },
+    {
+      "url": "https://sltda.gov.lk/storage/common_media/c52045bb690bb0e3abbe3ef3788daff9.pdf",
+      "filename": "c52045bb690bb0e3abbe3ef3788daff9.pdf",
+      "sha256": "ca44bb1055a41c4809810cb2d3ccf820f1befcfbab7f31efa9d5aaa74e661908",
+      "section_id": 2,
+      "section_name": "Financial Concessions & Banking Circulars",
+      "document_name": "7% Tax Rate",
+      "file_size_kb": 323,
+      "local_path": "/app/documents/raw/section_02_financial/c52045bb690bb0e3abbe3ef3788daff9.pdf"
+    },
+    {
+      "url": "https://sltda.gov.lk/storage/common_media/cfe09ff1dce7a6dce8a178f2620e7099.pdf",
+      "filename": "cfe09ff1dce7a6dce8a178f2620e7099.pdf",
+      "sha256": "788ade0ab2d69afe55c57267c50b50d39d0ca37bb8d379640b14d31473e16cb5",
+      "section_id": 2,
+      "section_name": "Financial Concessions & Banking Circulars",
+      "document_name": "Banking Circular No 07 Of 2019",
+      "file_size_kb": 573,
+      "local_path": "/app/documents/raw/section_02_financial/cfe09ff1dce7a6dce8a178f2620e7099.pdf"
+    },
+    {
+      "url": "https://sltda.gov.lk/storage/common_media/5417d3d26783ac236b6f58f368f45c01.pdf",
+      "filename": "5417d3d26783ac236b6f58f368f45c01.pdf",
+      "sha256": "b941ce5b2445216270a3683af0d82599213da1dd3c9f3ce8303f90927d51586d",
+      "section_id": 2,
+      "section_name": "Financial Concessions & Banking Circulars",
+      "document_name": "Banking Circular Explanatory NoteEnglish",
+      "file_size_kb": 341,
+      "local_path": "/app/documents/raw/section_02_financial/5417d3d26783ac236b6f58f368f45c01.pdf"
+    },
+    {
+      "url": "https://sltda.gov.lk/storage/common_media/30fbe1f51e4308b9bcc5dec6a04f287f.pdf",
+      "filename": "30fbe1f51e4308b9bcc5dec6a04f287f.pdf",
+      "sha256": "7ebec0fcabe5516f5a82ca9b371f0adec99226db898a6056f186a7dc492e340f",
+      "section_id": 2,
+      "section_name": "Financial Concessions & Banking Circulars",
+      "document_name": "Concessions granted to the Tourism Industry",
+      "file_size_kb": 73,
+      "local_path": "/app/documents/raw/section_02_financial/30fbe1f51e4308b9bcc5dec6a04f287f.pdf"
+    },
+    {
+      "url": "https://sltda.gov.lk/storage/common_media/moratorium-for-music-groups1287583089.pdf",
+      "filename": "moratorium-for-music-groups1287583089.pdf",
+      "sha256": "79312bd36b6139cf0e261b0f60b8afb6980f2d3b4144abc048d8b1b4493efd0c",
+      "section_id": 2,
+      "section_name": "Financial Concessions & Banking Circulars",
+      "document_name": "Moratorium for Music GroupsEnglish",
+      "file_size_kb": 516,
+      "local_path": "/app/documents/raw/section_02_financial/moratorium-for-music-groups1287583089.pdf"
+    },
+    {
+      "url": "https://sltda.gov.lk/storage/common_media/dca8b10c84bf4322807b17a556881b5c.pdf",
+      "filename": "dca8b10c84bf4322807b17a556881b5c.pdf",
+      "sha256": "a77e1bcb96da1f373071c6ccfd8346527be7d823ab5528ce5d2bb9b80bf8a38a",
+      "section_id": 1,
+      "section_name": "Registration & Renewal",
+      "document_name": "Registration Of Association",
+      "file_size_kb": 595,
+      "local_path": "/app/documents/raw/section_01_registration/dca8b10c84bf4322807b17a556881b5c.pdf"
+    },
+    {
+      "url": "https://sltda.gov.lk/storage/common_media/d8a3cc2befb64e37f1555dcf9648d405.pdf",
+      "filename": "d8a3cc2befb64e37f1555dcf9648d405.pdf",
+      "sha256": "6075c65c1813be4d47754a361aa6c08d11584f4c45169c16caf702e0972d0412",
+      "section_id": 1,
+      "section_name": "Registration & Renewal",
+      "document_name": "List Of Registered Associations",
+      "file_size_kb": 107,
+      "local_path": "/app/documents/raw/section_01_registration/d8a3cc2befb64e37f1555dcf9648d405.pdf"
+    },
+    {
+      "url": "https://www.sltda.gov.lk/storage/common_media/SLTDAOwnedLandsWithSourceDocuments_compressed.pdf",
+      "filename": "SLTDAOwnedLandsWithSourceDocuments_compressed.pdf",
+      "sha256": "e0b7ed6dfc272666db15f658012d290ec4885617309d67c6e4888f6b9b3f76fc",
+      "section_id": 1,
+      "section_name": "Registration & Renewal",
+      "document_name": "SLTDA Owned Lands With Source Documents",
+      "file_size_kb": 97662,
+      "local_path": "/app/documents/raw/section_01_registration/SLTDAOwnedLandsWithSourceDocuments_compressed.pdf"
+    },
+    {
+      "url": "https://sltda.gov.lk/storage/common_media/a1a8a34460ac8ce988190d92a6ec154d.pdf",
+      "filename": "a1a8a34460ac8ce988190d92a6ec154d.pdf",
+      "sha256": "33ef4e74f283151f58967172bb8fc33d8c00298d1bc09914f0596768c56fbb14",
+      "section_id": 5,
+      "section_name": "Adventure & Recreational Tourism",
+      "document_name": "Tourism Development LevyGazette",
+      "file_size_kb": 104,
+      "local_path": "/app/documents/raw/section_05_adventure/a1a8a34460ac8ce988190d92a6ec154d.pdf"
+    },
+    {
+      "url": "https://sltda.gov.lk/storage/common_media/00cb48ada8cb309b26cdc0c474513195.pdf",
+      "filename": "00cb48ada8cb309b26cdc0c474513195.pdf",
+      "sha256": "96f713ea184366a001ad98a299c520b8af71ef5fd979a929d6dbb014226f2c42",
+      "section_id": 5,
+      "section_name": "Adventure & Recreational Tourism",
+      "document_name": "Check List",
+      "file_size_kb": 950,
+      "local_path": "/app/documents/raw/section_05_adventure/00cb48ada8cb309b26cdc0c474513195.pdf"
+    },
+    {
+      "url": "https://sltda.gov.lk/storage/common_media/tdl clr-091020201531133780398669.pdf",
+      "filename": "tdl clr-091020201531133780398669.pdf",
+      "sha256": "e73efb35a0ee1dda25f0b4e2482d000d0efaf8fb8188429cb7c4eb0e2cd04c0b",
+      "section_id": 5,
+      "section_name": "Adventure & Recreational Tourism",
+      "document_name": "TDL Clearance Form",
+      "file_size_kb": 475,
+      "local_path": "/app/documents/raw/section_05_adventure/tdl clr-091020201531133780398669.pdf"
+    },
+    {
+      "url": "https://sltda.gov.lk/storage/common_media/28f70160ca7be1cc8663e4107edd74f7.pdf",
+      "filename": "28f70160ca7be1cc8663e4107edd74f7.pdf",
+      "sha256": "6e202ac8e6ab338e23075fb09ee6fa849cff8f5c5514d7e765e53dfaae4967e5",
+      "section_id": 5,
+      "section_name": "Adventure & Recreational Tourism",
+      "document_name": "Additional Information",
+      "file_size_kb": 549,
+      "local_path": "/app/documents/raw/section_05_adventure/28f70160ca7be1cc8663e4107edd74f7.pdf"
+    },
+    {
+      "url": "https://sltda.gov.lk/storage/common_media/Common%20Application%20Form_20200416_Fillable1052702601.pdf",
+      "filename": "Common%20Application%20Form_20200416_Fillable1052702601.pdf",
+      "sha256": "ad596f22cfb7a32d24c0ac1eba61f9801abd1077600666bca76d8a55a6fe5891",
+      "section_id": 8,
+      "section_name": "Investment & Investor Unit",
+      "document_name": "Common Application",
+      "file_size_kb": 1909,
+      "local_path": "/app/documents/raw/section_08_investment/Common%20Application%20Form_20200416_Fillable1052702601.pdf"
+    },
+    {
+      "url": "https://sltda.gov.lk/storage/common_media/SLTDA Full Process_V2.5 (1)1971985511.pdf",
+      "filename": "SLTDA Full Process_V2.5 (1)1971985511.pdf",
+      "sha256": "072fa551b88fdd528087ad56ef364fea77f3ca010e6e000e3cdc035c0a891dd3",
+      "section_id": 8,
+      "section_name": "Investment & Investor Unit",
+      "document_name": "SLTDA Full Process",
+      "file_size_kb": 105,
+      "local_path": "/app/documents/raw/section_08_investment/SLTDA Full Process_V2.5 (1)1971985511.pdf"
+    },
+    {
+      "url": "https://www.sltda.gov.lk/storage/common_media//Monthly_Tourist_Arrivals_Report_November.pdf",
+      "filename": "Monthly_Tourist_Arrivals_Report_November.pdf",
+      "sha256": "106babad873da2398ceadaf9dc020cdec5ff86d4951f29709d283a3df87b25d8",
+      "section_id": 9,
+      "section_name": "Statistics & Arrivals Reports",
+      "document_name": "Monthly Arrivals ReportLatest",
+      "file_size_kb": 2331,
+      "local_path": "/app/documents/raw/section_09_statistics/Monthly_Tourist_Arrivals_Report_November.pdf"
+    },
+    {
+      "url": "https://www.sltda.gov.lk/storage/common_media/Annual Stastistical Report 2021 -Final 25.4.20223624932970.pdf",
+      "filename": "Annual Stastistical Report 2021 -Final 25.4.20223624932970.pdf",
+      "sha256": "60248a1446b197aee6af3ec52223856de6f74e80189242cd40bd40df8603cd1e",
+      "section_id": 9,
+      "section_name": "Statistics & Arrivals Reports",
+      "document_name": "Annual Statistical Report Latest",
+      "file_size_kb": 10179,
+      "local_path": "/app/documents/raw/section_09_statistics/Annual Stastistical Report 2021 -Final 25.4.20223624932970.pdf"
+    },
+    {
+      "url": "https://www.sltda.gov.lk/storage/common_media/Sri_Lanka-Final_V6_Edited850147500.pdf",
+      "filename": "Sri_Lanka-Final_V6_Edited850147500.pdf",
+      "sha256": "c0cec8ff206bb7bf0d2119e44ef69c9c3a3a8df34b361692425099d9a27b308a",
+      "section_id": 5,
+      "section_name": "Adventure & Recreational Tourism",
+      "document_name": "Strategic Plan for Sri Lanka Tourism 2022-2025",
+      "file_size_kb": 23881,
+      "local_path": "/app/documents/raw/section_05_adventure/Sri_Lanka-Final_V6_Edited850147500.pdf"
+    },
+    {
+      "url": "https://sltda.gov.lk/storage/common_media/NTC_Report_Final_20Nov2023.pdf",
+      "filename": "NTC_Report_Final_20Nov2023.pdf",
+      "sha256": "a319cf4d3745334738b0c0ffbf146ac571024a882e45945b3ffd3bb014599321",
+      "section_id": 5,
+      "section_name": "Adventure & Recreational Tourism",
+      "document_name": "Niche Tourism Categories in Sri Lanka",
+      "file_size_kb": 43177,
+      "local_path": "/app/documents/raw/section_05_adventure/NTC_Report_Final_20Nov2023.pdf"
+    },
+    {
+      "url": "https://www.sltda.gov.lk/storage/common_media/Adventure_Tourism_Toolkit.pdf",
+      "filename": "Adventure_Tourism_Toolkit.pdf",
+      "sha256": "53ec582f916e4a38339959973a9c0ef4f3ca09a7b2612227c46530788ee06ad3",
+      "section_id": 5,
+      "section_name": "Adventure & Recreational Tourism",
+      "document_name": "Adventure Tourism Toolkit",
+      "file_size_kb": 29070,
+      "local_path": "/app/documents/raw/section_05_adventure/Adventure_Tourism_Toolkit.pdf"
+    },
+    {
+      "url": "https://www.sltda.gov.lk/storage/common_media/Agrotourism_Toolkit.pdf",
+      "filename": "Agrotourism_Toolkit.pdf",
+      "sha256": "9b63f4dab1a027be1cf483bc7dbff2c6f63fce7369b8c7cc3d42e249cf0e43ef",
+      "section_id": 5,
+      "section_name": "Adventure & Recreational Tourism",
+      "document_name": "Agrotourism Toolkit",
+      "file_size_kb": 25938,
+      "local_path": "/app/documents/raw/section_05_adventure/Agrotourism_Toolkit.pdf"
+    },
+    {
+      "url": "https://www.sltda.gov.lk/storage/common_media/Art_Culture_Heritage_Toolkit.pdf",
+      "filename": "Art_Culture_Heritage_Toolkit.pdf",
+      "sha256": "54a311b9b1304e44e0bf41571bfbeace06fa444b92ff5f2a562da2537d0d6af2",
+      "section_id": 5,
+      "section_name": "Adventure & Recreational Tourism",
+      "document_name": "Art Culture Heritage Toolkit",
+      "file_size_kb": 14155,
+      "local_path": "/app/documents/raw/section_05_adventure/Art_Culture_Heritage_Toolkit.pdf"
+    },
+    {
+      "url": "https://www.sltda.gov.lk/storage/common_media/Brand_Toolkit.pdf",
+      "filename": "Brand_Toolkit.pdf",
+      "sha256": "7894f78c1e563d7bcc039a7896d72ebeabcf8742ab0b477a0a99c95f77992b37",
+      "section_id": 5,
+      "section_name": "Adventure & Recreational Tourism",
+      "document_name": "Brand Toolkit",
+      "file_size_kb": 17990,
+      "local_path": "/app/documents/raw/section_05_adventure/Brand_Toolkit.pdf"
+    },
+    {
+      "url": "https://www.sltda.gov.lk/storage/common_media/Digital_Nomad_Toolkit.pdf",
+      "filename": "Digital_Nomad_Toolkit.pdf",
+      "sha256": "0ea51c445cb4600f0d4f39d1562bdc534a85ac952bdfddff82a743f942cc5130",
+      "section_id": 5,
+      "section_name": "Adventure & Recreational Tourism",
+      "document_name": "Digital Nomad Toolkit",
+      "file_size_kb": 22531,
+      "local_path": "/app/documents/raw/section_05_adventure/Digital_Nomad_Toolkit.pdf"
+    },
+    {
+      "url": "https://www.sltda.gov.lk/storage/common_media/Festivals_Tourism_Toolkit.pdf",
+      "filename": "Festivals_Tourism_Toolkit.pdf",
+      "sha256": "6cf2531afc6f9a0bebc4bdc43269bc398cdda391a4f58747012bb09338eb0773",
+      "section_id": 5,
+      "section_name": "Adventure & Recreational Tourism",
+      "document_name": "Festivals Tourism Toolkit",
+      "file_size_kb": 27702,
+      "local_path": "/app/documents/raw/section_05_adventure/Festivals_Tourism_Toolkit.pdf"
+    },
+    {
+      "url": "https://www.sltda.gov.lk/storage/common_media/Food_drink_Tourism_Toolkit.pdf",
+      "filename": "Food_drink_Tourism_Toolkit.pdf",
+      "sha256": "73a3a50027588ca7c52cd5fc023b9907727dc94b43d6b71d15949aeac20f87c2",
+      "section_id": 5,
+      "section_name": "Adventure & Recreational Tourism",
+      "document_name": "Food drink Tourism Toolkit",
+      "file_size_kb": 26060,
+      "local_path": "/app/documents/raw/section_05_adventure/Food_drink_Tourism_Toolkit.pdf"
+    },
+    {
+      "url": "https://www.sltda.gov.lk/storage/common_media/Hosted_or_curated_Travel_Toolkit.pdf",
+      "filename": "Hosted_or_curated_Travel_Toolkit.pdf",
+      "sha256": "b1c5ef3fe406b77539e7457992b02b72da4c1f94c139df1ca2906d146fb95283",
+      "section_id": 4,
+      "section_name": "Food & Beverage",
+      "document_name": "Hosted or curated Travel Toolkit",
+      "file_size_kb": 24968,
+      "local_path": "/app/documents/raw/section_04_food_beverage/Hosted_or_curated_Travel_Toolkit.pdf"
+    },
+    {
+      "url": "https://www.sltda.gov.lk/storage/common_media/MICE_Tourism_Toolkit.pdf",
+      "filename": "MICE_Tourism_Toolkit.pdf",
+      "sha256": "077c10edc831dbe98402e3b9c652765ba4f83871a5a354070643cceaca198300",
+      "section_id": 4,
+      "section_name": "Food & Beverage",
+      "document_name": "MICE Tourism Toolkit",
+      "file_size_kb": 12844,
+      "local_path": "/app/documents/raw/section_04_food_beverage/MICE_Tourism_Toolkit.pdf"
+    },
+    {
+      "url": "https://www.sltda.gov.lk/storage/common_media/Nature_wildlife_Tourism_Toolkit.pdf",
+      "filename": "Nature_wildlife_Tourism_Toolkit.pdf",
+      "sha256": "74806bc6dccaea08d4c5b5ba04ab5ceaeea816b328e0ecc50016db7cd7c8ecdd",
+      "section_id": 5,
+      "section_name": "Adventure & Recreational Tourism",
+      "document_name": "Nature wildlife Tourism Toolkit",
+      "file_size_kb": 28114,
+      "local_path": "/app/documents/raw/section_05_adventure/Nature_wildlife_Tourism_Toolkit.pdf"
+    },
+    {
+      "url": "https://www.sltda.gov.lk/storage/common_media/Volunteer_Tourism_Toolkit.pdf",
+      "filename": "Volunteer_Tourism_Toolkit.pdf",
+      "sha256": "13dc2f3ea7df841c5f9064bd2cf8b39edb09ac7b3024a926b996b2701de7be47",
+      "section_id": 5,
+      "section_name": "Adventure & Recreational Tourism",
+      "document_name": "Volunteer Tourism Toolkit",
+      "file_size_kb": 13791,
+      "local_path": "/app/documents/raw/section_05_adventure/Volunteer_Tourism_Toolkit.pdf"
+    },
+    {
+      "url": "https://www.sltda.gov.lk/storage/common_media/Weddings_Tourism_Toolkit.pdf",
+      "filename": "Weddings_Tourism_Toolkit.pdf",
+      "sha256": "1b0caa5b1961b7cb44e2bde343af11d05a6629271420bda2d80da15333ba7aae",
+      "section_id": 5,
+      "section_name": "Adventure & Recreational Tourism",
+      "document_name": "Weddings Tourism Toolkit",
+      "file_size_kb": 29765,
+      "local_path": "/app/documents/raw/section_05_adventure/Weddings_Tourism_Toolkit.pdf"
+    },
+    {
+      "url": "https://www.sltda.gov.lk/storage/common_media/Wellness_tourism_Toolkit.pdf",
+      "filename": "Wellness_tourism_Toolkit.pdf",
+      "sha256": "50c35fd3095e7add803e6d2046d842b53b4a3fa866c482087500c06112fba6ea",
+      "section_id": 5,
+      "section_name": "Adventure & Recreational Tourism",
+      "document_name": "Wellness tourism Toolkit",
+      "file_size_kb": 25315,
+      "local_path": "/app/documents/raw/section_05_adventure/Wellness_tourism_Toolkit.pdf"
+    },
+    {
+      "url": "https://sltda.gov.lk/storage/common_media/b4f1d4aec5e8a84b69e215c6734c7b07.pdf",
+      "filename": "b4f1d4aec5e8a84b69e215c6734c7b07.pdf",
+      "sha256": "fdf4bbdb4b8a5c9fe6f149fa5866de31cb938cc1c09b8c2be393fba204c7cb4b",
+      "section_id": 5,
+      "section_name": "Adventure & Recreational Tourism",
+      "document_name": "Tourism Act No 38 of 2005",
+      "file_size_kb": 120,
+      "local_path": "/app/documents/raw/section_05_adventure/b4f1d4aec5e8a84b69e215c6734c7b07.pdf"
+    }
+  ]
+}

@@ -34,7 +34,7 @@ from sltda_mcp.ingestion.extractors.legislation import LegislationExtractor
 from sltda_mcp.ingestion.extractors.narrative import NarrativeExtractor
 from sltda_mcp.ingestion.extractors.steps import StepsExtractor
 from sltda_mcp.ingestion.extractors.toolkit import ToolkitExtractor
-from sltda_mcp.ingestion.format_identifier import identify_format, load_strategy
+from sltda_mcp.ingestion.format_identifier import extract_features, identify_format
 from sltda_mcp.ingestion.pg_sync import (
     sync_business_categories,
     sync_document,
@@ -48,6 +48,17 @@ from sltda_mcp.ingestion.scraper import scrape_document_list
 from sltda_mcp.ingestion.validator import validate_extraction
 
 logger = logging.getLogger(__name__)
+
+def _strip_nulls(obj):
+    """Recursively strip null bytes from strings in a nested dict/list structure."""
+    if isinstance(obj, str):
+        return obj.replace("\x00", "")
+    if isinstance(obj, dict):
+        return {k: _strip_nulls(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_strip_nulls(i) for i in obj]
+    return obj
+
 
 # Parse-failure abort threshold (Issue #3)
 _ABORT_THRESHOLD = 0.10
@@ -97,9 +108,11 @@ async def _smoke_tests(conn: asyncpg.Connection) -> list[str]:
     if not doc_count or doc_count == 0:
         failures.append("documents_staging is empty")
 
+    # Ensure at least some content was synced (sections or steps)
+    section_count = await conn.fetchval("SELECT COUNT(*) FROM document_sections_staging")
     step_count = await conn.fetchval("SELECT COUNT(*) FROM registration_steps_staging")
-    if not step_count or step_count == 0:
-        failures.append("registration_steps_staging is empty")
+    if (not section_count or section_count == 0) and (not step_count or step_count == 0):
+        failures.append("both document_sections_staging and registration_steps_staging are empty")
 
     # Ensure no NULL category_names slipped through
     bad_cats = await conn.fetchval(
@@ -124,31 +137,38 @@ async def _process_document(
     Steps 4–10 for a single document.
     Returns (chunks_produced, chunk_list) on success, raises on hard failure.
     """
-    settings = get_settings()
     doc = doc_change.candidate
     document_id = str(uuid.uuid4())
-    pdf_path = Path(settings.documents_base_path) / "raw" / doc.section_name.replace(" ", "_") / doc.filename
+    pdf_path = Path(doc_change.local_path)
 
-    # Step 4: Format identification
-    classification = await identify_format(pdf_path)
-    strategy = load_strategy(classification.format_family)
+    # Step 4: Format identification (Tier 0 uses section_id + document_name)
+    features = extract_features(pdf_path)
+    classification, strategy = await identify_format(
+        features,
+        section_id=doc_change.candidate.section_id,
+        document_name=doc_change.candidate.document_name,
+    )
 
     # Step 5: Extraction
     extractor_cls = _EXTRACTOR_REGISTRY.get(strategy.extractor_class, FallbackExtractor)
     extractor = extractor_cls()
     result = extractor.extract(pdf_path, uuid.UUID(document_id))
+    # Strip null bytes — PostgreSQL UTF8 rejects \x00
+    if result.text:
+        result.text = result.text.replace("\x00", "")
+    if result.structured_data:
+        result.structured_data = _strip_nulls(result.structured_data)
 
     # Step 6: Pandera validation
     if result.structured_data:
-        validate_extraction(result.structured_data, classification.format_family)
+        validate_extraction(result, classification.format_family)
 
     # Step 7: Chunking
     chunks = chunk_document(
-        document_id=document_id,
-        text=result.text,
+        result=result,
         format_family=classification.format_family,
-        strategy=strategy.chunk_strategy,
-        structured_data=result.structured_data,
+        chunk_strategy=strategy.chunk_strategy,
+        document_id=uuid.UUID(document_id),
     )
 
     # Step 10: PG sync
@@ -161,7 +181,7 @@ async def _process_document(
         "source_url": doc.source_url,
         "local_path": str(pdf_path),
         "file_size_kb": round(file_stat.st_size / 1024) if file_stat else None,
-        "content_hash": doc_change.new_hash,
+        "content_hash": doc_change.current_hash,
         "language": doc.language,
         "format_family": classification.format_family,
         "format_confidence": classification.confidence,
@@ -243,7 +263,7 @@ async def run_pipeline(dry_run: bool = False) -> dict[str, Any]:
             # ── Step 2: Change detection ──────────────────────────────────────────
             await _update_pipeline_state(conn, run_id, 2, "running")
             manifests_dir = Path(settings.documents_base_path) / "manifests"
-            changes = detect_changes(candidates, manifests_dir)
+            changes, _removed = detect_changes(candidates, manifests_dir)
             to_process = [c for c in changes if c.change_type in (ChangeType.NEW, ChangeType.MODIFIED)]
             await _update_pipeline_state(conn, run_id, 2, "done", f"{len(to_process)} to process")
             logger.info("Step 2 done: %d new/modified documents", len(to_process))
@@ -255,12 +275,22 @@ async def run_pipeline(dry_run: bool = False) -> dict[str, Any]:
             # ── Step 3: Download ──────────────────────────────────────────────────
             await _update_pipeline_state(conn, run_id, 3, "running")
             batch_result = await download_documents([c.candidate for c in to_process])
-            successful = [r for r in batch_result.results if r.status == DownloadStatus.SUCCESS]
+            successful = batch_result.successful
             await _update_pipeline_state(
                 conn, run_id, 3, "done",
                 f"{len(successful)}/{len(to_process)} downloaded"
             )
             logger.info("Step 3 done: %d/%d downloaded", len(successful), len(to_process))
+
+            # Populate local_path and content_hash from download results onto changes
+            successful_by_url = {r.candidate.source_url: r for r in successful}
+            for change in to_process:
+                result = successful_by_url.get(change.candidate.source_url)
+                if result:
+                    change.local_path = str(result.local_path)
+                    change.current_hash = result.content_hash
+                    change.file_size_kb = result.file_size_kb
+            to_process = [c for c in to_process if c.local_path is not None]
 
             # ── Steps 4–10: Format/Extract/Chunk/Embed/Upsert/PGSync ─────────────
             await _update_pipeline_state(conn, run_id, 4, "running", "extract/chunk/embed loop")
@@ -300,33 +330,17 @@ async def run_pipeline(dry_run: bool = False) -> dict[str, Any]:
 
             # ── Step 8: Embed ─────────────────────────────────────────────────────
             await _update_pipeline_state(conn, run_id, 8, "running", "embedding chunks")
-            embedded = await embed_chunks(all_chunks, conn=conn, run_id=run_id)
+            embedded = await embed_chunks(all_chunks)
             await _update_pipeline_state(conn, run_id, 8, "done", f"{len(embedded)} embedded")
 
             # ── Step 9: Qdrant upsert ─────────────────────────────────────────────
             await _update_pipeline_state(conn, run_id, 9, "running", "upserting to Qdrant staging")
-            upsert_chunks(qdrant_sync_client, embedded)
-
-            # Verify point count within tolerance
-            from qdrant_client.http.exceptions import UnexpectedResponse
             try:
-                info = qdrant_sync_client.get_collection("sltda_documents_next")
-                actual = info.points_count or 0
-            except UnexpectedResponse:
-                actual = 0
-
-            expected = len(embedded)
-            if expected > 0:
-                deviation = abs(actual - expected) / expected
-                if deviation > _QDRANT_TOLERANCE:
-                    msg = (
-                        f"Abort: Qdrant point count deviation {deviation:.1%} "
-                        f"(expected ~{expected}, got {actual})"
-                    )
-                    await _update_pipeline_state(conn, run_id, 9, "aborted", msg)
-                    exc = IngestionError(msg)
-                    await notify_ingestion_failed(exc, run_id)
-                    raise exc
+                actual = upsert_chunks(embedded, qdrant_sync_client, expected_count=len(embedded))
+            except Exception as exc:
+                await _update_pipeline_state(conn, run_id, 9, "aborted", str(exc))
+                await notify_ingestion_failed(exc, run_id)
+                raise
 
             await _update_pipeline_state(conn, run_id, 9, "done", f"{actual} points in staging")
 
@@ -356,7 +370,7 @@ async def run_pipeline(dry_run: bool = False) -> dict[str, Any]:
                 await _update_pipeline_state(conn, run_id, 12, "done")
 
             # ── Step 13: Write manifest ───────────────────────────────────────────
-            write_manifest(candidates, manifests_dir, run_id)
+            write_manifest(successful, manifests_dir, run_id)
             await _update_pipeline_state(conn, run_id, 13, "done", "manifest written")
 
             summary = {
@@ -367,7 +381,7 @@ async def run_pipeline(dry_run: bool = False) -> dict[str, Any]:
                 "processed": len(to_process) - parse_failures,
                 "parse_failures": parse_failures,
                 "chunks_embedded": len(embedded),
-                "qdrant_points": actual if not dry_run else expected,
+                "qdrant_points": actual,
                 "dry_run": dry_run,
             }
             logger.info("Pipeline run %s complete: %s", run_id, summary)

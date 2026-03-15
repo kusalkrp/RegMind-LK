@@ -22,8 +22,8 @@ from sltda_mcp.ingestion.chunker import Chunk
 
 logger = logging.getLogger(__name__)
 
-EMBEDDING_MODEL = "models/text-embedding-004"
-EMBEDDING_DIM = 768
+EMBEDDING_MODEL = "models/gemini-embedding-001"
+EMBEDDING_DIM = 3072
 BATCH_SIZE = 100
 
 
@@ -92,6 +92,12 @@ async def embed_chunks(
     skipped = len(chunks) - len(to_embed)
     if skipped:
         logger.info("Embedder: skipping %d already-embedded chunks (checkpoint=%d)", skipped, checkpoint)
+
+    # Drop empty chunks (Gemini rejects empty content)
+    empty = [c for c in to_embed if not c.chunk_text or not c.chunk_text.strip()]
+    if empty:
+        logger.warning("Embedder: dropping %d empty chunks", len(empty))
+        to_embed = [c for c in to_embed if c.chunk_text and c.chunk_text.strip()]
 
     # Deduplicate
     to_embed = _dedup_chunks(to_embed)
