@@ -10,7 +10,11 @@ import logging
 from typing import Any
 
 from sltda_mcp.mcp_server.rag import run_rag
-from sltda_mcp.mcp_server.tools.base import build_envelope, legal_disclaimer
+from sltda_mcp.mcp_server.tools.base import (
+    build_envelope,
+    legal_disclaimer,
+    validate_tool_inputs,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,11 +34,17 @@ async def get_strategic_plan(
 
     Call this for questions about SLTDA's strategic goals, tourism targets,
     development priorities, or policy direction.
-    Do NOT use this for legal provisions — use get_tourism_act_provisions instead.
+    Do NOT use this for legal text, Act provisions, or offences under tourism
+    law — use tourism_act_provisions instead.
     """
+    p = validate_tool_inputs(
+        {"query": query, "section_focus": section_focus},
+        required=frozenset({"query"}),
+    )
+
     result = await run_rag(
-        query=query,
-        section_filter=section_focus or _SECTION_STRATEGIC,
+        query=p["query"],
+        section_filter=p["section_focus"] or _SECTION_STRATEGIC,
     )
 
     source_docs = [
@@ -73,20 +83,24 @@ async def get_tourism_act_provisions(
 
     Call this for legal provisions, sections of the Act, definitions,
     offences, penalties, or regulatory powers under Sri Lanka tourism law.
-    For policy goals and strategy, use get_strategic_plan instead.
+    Do NOT use this for policy goals and tourism targets — use
+    strategic_plan instead.
     """
+    p = validate_tool_inputs(
+        {"topic": topic},
+        required=frozenset({"topic"}),
+    )
+
     result = await run_rag(
-        query=topic,
+        query=p["topic"],
         section_filter=_SECTION_LEGISLATION,
         document_type_filter="legislation",
     )
 
-    # Extract section numbers from chunk metadata if available
     sections_cited: list[str] = []
     for chunk in result.chunks:
-        pages = chunk.page_numbers
-        if pages:
-            sections_cited.append(f"p.{pages[0]}")
+        if chunk.page_numbers:
+            sections_cited.append(f"p.{chunk.page_numbers[0]}")
 
     source_docs = [
         {

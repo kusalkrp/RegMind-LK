@@ -11,7 +11,12 @@ from typing import Any, Literal
 
 from sltda_mcp.database import acquire
 from sltda_mcp.mcp_server.rag import run_rag
-from sltda_mcp.mcp_server.tools.base import build_envelope, not_found_envelope
+from sltda_mcp.mcp_server.tools.base import (
+    assert_literal,
+    build_envelope,
+    not_found_envelope,
+    validate_tool_inputs,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,17 +35,20 @@ async def get_niche_categories(
 
     Call this when a user wants to discover what niche tourism types SLTDA
     supports, or to browse available categories before drilling into one.
-    For detailed toolkit information, use get_niche_toolkit.
+    Do NOT use this to get detailed operational guidelines for a specific
+    niche — use niche_toolkit for that.
     """
+    p = validate_tool_inputs({"filter": filter})
+
     async with acquire() as conn:
-        if filter:
+        if p["filter"]:
             rows = await conn.fetch(
                 """SELECT toolkit_code, toolkit_name, target_market, extraction_confidence
                    FROM niche_toolkits
                    WHERE LOWER(toolkit_name) LIKE $1
                       OR LOWER(target_market) LIKE $1
                    ORDER BY toolkit_name""",
-                f"%{filter.lower()}%",
+                f"%{p['filter'].lower()}%",
             )
         else:
             rows = await conn.fetch(
@@ -52,8 +60,8 @@ async def get_niche_categories(
     if not rows:
         return not_found_envelope(
             _TOOL_CATS,
-            f"No niche categories found"
-            + (f" matching '{filter}'." if filter else "."),
+            "No niche categories found"
+            + (f" matching '{p['filter']}'." if p["filter"] else "."),
         )
 
     return build_envelope(
@@ -61,11 +69,12 @@ async def get_niche_categories(
         status="success",
         data={
             "total": len(rows),
-            "filter": filter,
+            "filter": p["filter"],
             "categories": [dict(r) for r in rows],
         },
         source_type="database",
         source_documents=[],
+        confidence="high",
     )
 
 
@@ -83,9 +92,17 @@ async def get_niche_toolkit(
     Call this when a user asks how to operate in a specific niche tourism
     segment (eco tourism, MICE, adventure, wellness, surfing, etc.).
     Use get_niche_categories first to discover available category codes.
+    Do NOT use this for general registration requirements common to all
+    businesses — use registration_requirements.
 
     Issue #8: extraction_confidence field present in all responses.
     """
+    p = validate_tool_inputs(
+        {"category": category, "detail_level": detail_level},
+        required=frozenset({"category"}),
+    )
+    assert_literal(p["detail_level"], ("summary", "full"), "detail_level")
+
     async with acquire() as conn:
         row = await conn.fetchrow(
             """SELECT nt.toolkit_code, nt.toolkit_name, nt.target_market,
@@ -95,13 +112,13 @@ async def get_niche_toolkit(
                FROM niche_toolkits nt
                LEFT JOIN documents d ON d.id = nt.document_id
                WHERE nt.toolkit_code = $1""",
-            category.upper(),
+            p["category"].upper(),
         )
 
     if not row:
         return not_found_envelope(
             _TOOL_TOOLKIT,
-            f"Niche toolkit '{category}' not found. "
+            f"Niche toolkit '{p['category']}' not found. "
             "Use get_niche_categories to list available codes.",
         )
 
@@ -116,11 +133,10 @@ async def get_niche_toolkit(
         "summary": row["summary"],
         "extraction_confidence": row["extraction_confidence"],
         "source_pages": row["source_pages"],
-        "detail_level": detail_level,
+        "detail_level": p["detail_level"],
     }
 
-    if detail_level == "full":
-        # RAG augmentation over the toolkit document
+    if p["detail_level"] == "full":
         rag_query = (
             f"What are the regulatory requirements and operational guidelines "
             f"for {row['toolkit_name']} in Sri Lanka?"
@@ -143,7 +159,7 @@ async def get_niche_toolkit(
         tool_name=_TOOL_TOOLKIT,
         status="success",
         data=data,
-        source_type="hybrid" if detail_level == "full" else "database",
+        source_type="hybrid" if p["detail_level"] == "full" else "database",
         source_documents=source_docs,
-        confidence=row["extraction_confidence"],
+        confidence=row["extraction_confidence"] or "medium",
     )

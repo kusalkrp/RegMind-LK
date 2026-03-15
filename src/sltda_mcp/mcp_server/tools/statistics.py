@@ -10,14 +10,18 @@ import logging
 from typing import Literal
 
 from sltda_mcp.database import acquire
-from sltda_mcp.mcp_server.tools.base import build_envelope, not_found_envelope
+from sltda_mcp.mcp_server.tools.base import (
+    assert_literal,
+    build_envelope,
+    not_found_envelope,
+    validate_tool_inputs,
+)
 
 logger = logging.getLogger(__name__)
 
 _TOOL_ARRIVALS = "get_latest_arrivals_report"
 _TOOL_ANNUAL = "get_annual_report"
 
-# section_id values from section_map.yaml
 _SECTION_ARRIVALS = 9
 _SECTION_ANNUAL_REPORTS = 10
 
@@ -31,8 +35,12 @@ async def get_latest_arrivals_report(
 
     Call this when a user asks about tourist arrival numbers, visitor statistics,
     top source markets, or accommodation occupancy data.
-    For full SLTDA annual reports (financials + strategy), use get_annual_report.
+    Do NOT use this for the full SLTDA annual report with audited financials or
+    organisational strategy — use annual_report.
     """
+    p = validate_tool_inputs({"report_type": report_type})
+    assert_literal(p["report_type"], ("monthly", "annual"), "report_type")
+
     async with acquire() as conn:
         params: list = [_SECTION_ARRIVALS]
         filters = ["section_id = $1", "is_active = TRUE"]
@@ -43,11 +51,11 @@ async def get_latest_arrivals_report(
             params.append(year)
             idx += 1
 
-        if report_type == "monthly":
+        if p["report_type"] == "monthly":
             filters.append(f"LOWER(document_name) LIKE ${idx}")
             params.append("%monthly%")
             idx += 1
-        elif report_type == "annual":
+        elif p["report_type"] == "annual":
             filters.append(
                 f"(LOWER(document_name) LIKE ${idx} OR LOWER(document_name) LIKE ${idx + 1})"
             )
@@ -67,18 +75,17 @@ async def get_latest_arrivals_report(
         if not rows:
             return not_found_envelope(
                 _TOOL_ARRIVALS,
-                f"No {report_type} arrivals report found"
+                f"No {p['report_type']} arrivals report found"
                 + (f" for year {year}." if year else "."),
             )
 
-        latest = dict(rows[0])
         return build_envelope(
             tool_name=_TOOL_ARRIVALS,
             status="success",
             data={
-                "report_type": report_type,
+                "report_type": p["report_type"],
                 "year_filter": year,
-                "latest": latest,
+                "latest": dict(rows[0]),
                 "all_available": [dict(r) for r in rows],
             },
             source_type="database",
@@ -86,6 +93,7 @@ async def get_latest_arrivals_report(
                 {"type": "report", "name": r["document_name"], "url": r["source_url"]}
                 for r in rows if r["source_url"]
             ],
+            confidence="high",
         )
 
 
@@ -98,8 +106,11 @@ async def get_annual_report(
 
     Call this when a user asks for the SLTDA annual report, yearly performance
     summary, or audited financial statements for a given year.
-    For tourist arrival statistics only, use get_latest_arrivals_report.
+    Do NOT use this for monthly tourist arrivals statistics or source market
+    breakdowns — use latest_arrivals_report.
     """
+    p = validate_tool_inputs({"language": language})
+
     async with acquire() as conn:
         row = await conn.fetchrow(
             """SELECT document_name, source_url, content_as_of,
@@ -115,7 +126,7 @@ async def get_annual_report(
                ORDER BY content_as_of DESC NULLS LAST
                LIMIT 1""",
             _SECTION_ANNUAL_REPORTS,
-            language,
+            p["language"],
             f"%{year}%",
             year,
         )
@@ -124,7 +135,7 @@ async def get_annual_report(
             return not_found_envelope(
                 _TOOL_ANNUAL,
                 f"SLTDA Annual Report for {year} not found "
-                f"(language: {language}). "
+                f"(language: {p['language']}). "
                 "Available years may differ — try an adjacent year.",
             )
 
@@ -133,7 +144,7 @@ async def get_annual_report(
             status="success",
             data={
                 "year": year,
-                "language": language,
+                "language": p["language"],
                 "document_name": row["document_name"],
                 "download_url": row["source_url"],
                 "published": str(row["content_as_of"]) if row["content_as_of"] else None,
@@ -143,4 +154,5 @@ async def get_annual_report(
             source_documents=[
                 {"type": "annual_report", "name": row["document_name"], "url": row["source_url"]}
             ],
+            confidence="high",
         )

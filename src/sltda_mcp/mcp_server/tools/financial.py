@@ -12,9 +12,11 @@ from typing import Literal
 
 from sltda_mcp.database import acquire
 from sltda_mcp.mcp_server.tools.base import (
+    assert_literal,
     build_envelope,
     financial_disclaimer,
     not_found_envelope,
+    validate_tool_inputs,
 )
 
 logger = logging.getLogger(__name__)
@@ -22,6 +24,10 @@ logger = logging.getLogger(__name__)
 _TOOL_FC = "get_financial_concessions"
 _TOOL_TDL = "get_tdl_information"
 _TOOL_TAX = "get_tax_rate"
+
+_TDL_QUERY_TYPES = (
+    "overview", "rate", "clearance_process", "required_documents", "form_download"
+)
 
 
 async def get_financial_concessions(
@@ -34,25 +40,30 @@ async def get_financial_concessions(
 
     Call this when a user asks about financial benefits, concessionary loans,
     or banking facilities for tourism businesses.
-    For tax rates specifically, use get_tax_rate instead.
+    Do NOT use this for tax rate percentages or income tax exemptions — use
+    tax_rate for that.
     """
+    p = validate_tool_inputs({
+        "business_type": business_type,
+        "concession_type": concession_type,
+    })
+
     async with acquire() as conn:
         conditions = []
         params: list = []
         idx = 1
 
-        if business_type:
+        if p["business_type"]:
             conditions.append(f"$${idx} = ANY(applicable_to)")
-            params.append(business_type.lower())
+            params.append(p["business_type"].lower())
             idx += 1
 
-        if concession_type != "all":
+        if p["concession_type"] != "all":
             conditions.append(f"concession_type = $${idx}")
-            params.append(concession_type.lower())
+            params.append(p["concession_type"].lower())
             idx += 1
 
         where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
-        # Fix positional params — asyncpg uses $1, $2 not $$1, $$2
         where = where.replace("$$", "$")
 
         rows = await conn.fetch(
@@ -76,8 +87,7 @@ async def get_financial_concessions(
             {"type": "circular", "url": r["circular_url"]}
             for r in rows if r["circular_url"]
         ]
-        # Deduplicate source docs
-        seen = set()
+        seen: set[str] = set()
         unique_docs = []
         for d in source_docs:
             if d["url"] not in seen:
@@ -93,6 +103,7 @@ async def get_financial_concessions(
             },
             source_type="database",
             source_documents=unique_docs,
+            confidence="high",
             disclaimer=financial_disclaimer(),
         )
 
@@ -108,7 +119,12 @@ async def get_tdl_information(
 
     Call this for any question about TDL — what it is, how much it is,
     how to get clearance, or what documents are needed for clearance.
+    Do NOT use this for non-TDL tax questions, general financial concessions, or
+    banking facilities — use financial_concessions or tax_rate.
     """
+    p = validate_tool_inputs({"query_type": query_type})
+    assert_literal(p["query_type"], _TDL_QUERY_TYPES, "query_type")
+
     async with acquire() as conn:
         rows = await conn.fetch(
             """SELECT fc.concession_name, fc.rate_or_terms, fc.conditions,
@@ -120,7 +136,6 @@ async def get_tdl_information(
                ORDER BY fc.concession_name""",
         )
 
-        # Also fetch any TDL form documents
         form_docs = await conn.fetch(
             """SELECT document_name, source_url
                FROM documents
@@ -137,18 +152,17 @@ async def get_tdl_information(
             for f in form_docs if f["source_url"]
         ]
 
-        data: dict = {
-            "query_type": query_type,
-            "levy_records": [dict(r) for r in rows],
-            "forms": [dict(f) for f in form_docs],
-        }
-
         return build_envelope(
             tool_name=_TOOL_TDL,
             status="success" if rows or form_docs else "not_found",
-            data=data,
+            data={
+                "query_type": p["query_type"],
+                "levy_records": [dict(r) for r in rows],
+                "forms": [dict(f) for f in form_docs],
+            },
             source_type="database",
             source_documents=source_docs,
+            confidence="high" if rows else "low",
             disclaimer=financial_disclaimer(),
         )
 
@@ -161,10 +175,13 @@ async def get_tax_rate(
 
     Call this when a user asks about tax rates, tax exemptions, or
     income tax concessions for tourism businesses.
-    For broader financial concessions (loans, moratoriums), use get_financial_concessions.
+    Do NOT use this for interest-rate concessions, loan moratoriums, or TDL levy
+    rates — use financial_concessions or tdl_information.
     """
+    p = validate_tool_inputs({"business_type": business_type})
+
     async with acquire() as conn:
-        if business_type:
+        if p["business_type"]:
             rows = await conn.fetch(
                 """SELECT fc.concession_name, fc.rate_or_terms, fc.conditions,
                           fc.applicable_to, d.source_url AS doc_url
@@ -173,7 +190,7 @@ async def get_tax_rate(
                    WHERE fc.concession_type = 'tax'
                      AND $1 = ANY(fc.applicable_to)
                    ORDER BY fc.concession_name""",
-                business_type.lower(),
+                p["business_type"].lower(),
             )
         else:
             rows = await conn.fetch(
@@ -188,15 +205,15 @@ async def get_tax_rate(
         if not rows:
             return not_found_envelope(
                 _TOOL_TAX,
-                f"No tax rate records found"
-                + (f" for business type '{business_type}'." if business_type else "."),
+                "No tax rate records found"
+                + (f" for business type '{p['business_type']}'." if p["business_type"] else "."),
             )
 
         return build_envelope(
             tool_name=_TOOL_TAX,
             status="success",
             data={
-                "business_type_filter": business_type,
+                "business_type_filter": p["business_type"],
                 "total": len(rows),
                 "tax_rates": [dict(r) for r in rows],
             },
@@ -205,5 +222,6 @@ async def get_tax_rate(
                 {"type": "circular", "url": r["doc_url"]}
                 for r in rows if r["doc_url"]
             ],
+            confidence="high",
             disclaimer=financial_disclaimer(),
         )

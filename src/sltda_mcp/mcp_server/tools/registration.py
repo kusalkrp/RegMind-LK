@@ -12,9 +12,11 @@ from typing import Literal
 
 from sltda_mcp.database import acquire
 from sltda_mcp.mcp_server.tools.base import (
+    assert_literal,
     build_envelope,
     legal_disclaimer,
     not_found_envelope,
+    validate_tool_inputs,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,9 +37,15 @@ async def get_registration_requirements(
     Call this when a user asks HOW to register, renew, or what STEPS are required
     for a tourism business (e.g. hotel, guest house, boutique villa, travel agent).
 
-    Do NOT use this for standards or legal classifications — use
-    get_accommodation_standards instead.
+    Do NOT use this for star-rating standards or legal gazette references — use
+    accommodation_standards for those.
     """
+    p = validate_tool_inputs(
+        {"business_type": business_type, "action": action, "language": language},
+        required=frozenset({"business_type"}),
+    )
+    assert_literal(p["action"], ("register", "renew"), "action")
+
     async with acquire() as conn:
         category = await conn.fetchrow(
             """SELECT bc.category_code, bc.category_name, bc.category_group,
@@ -47,12 +55,12 @@ async def get_registration_requirements(
                LEFT JOIN documents d ON d.id = bc.gazette_document_id
                LEFT JOIN documents d2 ON d2.id = bc.checklist_document_id
                WHERE bc.category_code = $1""",
-            business_type.upper(),
+            p["business_type"].upper(),
         )
         if not category:
             return not_found_envelope(
                 _TOOL_REG_REQ,
-                f"Business type '{business_type}' not found. "
+                f"Business type '{p['business_type']}' not found. "
                 "Check spelling or use a known SLTDA category code.",
             )
 
@@ -62,8 +70,8 @@ async def get_registration_requirements(
                FROM registration_steps
                WHERE category_code = $1 AND action_type = $2
                ORDER BY step_number""",
-            business_type.upper(),
-            action,
+            p["business_type"].upper(),
+            p["action"],
         )
 
         source_docs = []
@@ -78,13 +86,14 @@ async def get_registration_requirements(
             data={
                 "business_type": category["category_name"],
                 "category_code": category["category_code"],
-                "action": action,
-                "language": language,
+                "action": p["action"],
+                "language": p["language"],
                 "step_count": len(steps),
                 "steps": [dict(s) for s in steps],
             },
             source_type="database",
             source_documents=source_docs,
+            confidence="high",
             disclaimer=legal_disclaimer(),
         )
 
@@ -98,8 +107,15 @@ async def get_accommodation_standards(
     for an SLTDA accommodation category (e.g. star hotel, boutique villa, homestay).
 
     Use this for standards and legal classifications.
-    For the step-by-step registration process, use get_registration_requirements instead.
+    Do NOT use this for the step-by-step registration process or required fees — use
+    registration_requirements instead.
     """
+    p = validate_tool_inputs(
+        {"category": category, "detail_level": detail_level},
+        required=frozenset({"category"}),
+    )
+    assert_literal(p["detail_level"], ("summary", "full"), "detail_level")
+
     async with acquire() as conn:
         row = await conn.fetchrow(
             """SELECT bc.category_code, bc.category_name, bc.category_group, bc.notes,
@@ -113,12 +129,12 @@ async def get_accommodation_standards(
                LEFT JOIN documents d_chk ON d_chk.id = bc.checklist_document_id
                LEFT JOIN documents d_reg ON d_reg.id = bc.registration_document_id
                WHERE bc.category_code = $1""",
-            category.upper(),
+            p["category"].upper(),
         )
         if not row:
             return not_found_envelope(
                 _TOOL_ACC_STD,
-                f"Category '{category}' not found in SLTDA classification records.",
+                f"Category '{p['category']}' not found in SLTDA classification records.",
             )
 
         data: dict = {
@@ -130,7 +146,7 @@ async def get_accommodation_standards(
             "checklist_url": row["checklist_url"],
             "registration_form_url": row["registration_url"],
         }
-        if detail_level == "full":
+        if p["detail_level"] == "full":
             data["notes"] = row["notes"]
 
         source_docs = [
@@ -149,6 +165,7 @@ async def get_accommodation_standards(
             data=data,
             source_type="database",
             source_documents=source_docs,
+            confidence="high",
             disclaimer=legal_disclaimer(),
         )
 
@@ -162,18 +179,28 @@ async def get_registration_checklist(
     registering, renewing, or preparing for SLTDA inspection of a tourism business.
 
     Call this when a user asks WHAT DOCUMENTS are needed.
-    For the full registration process with fees and steps, use get_registration_requirements.
+    Do NOT use this for registration fees, timelines, or inspection scheduling — use
+    registration_requirements for those details.
     """
+    p = validate_tool_inputs(
+        {"business_type": business_type, "checklist_type": checklist_type},
+        required=frozenset({"business_type"}),
+    )
+    assert_literal(
+        p["checklist_type"],
+        ("registration", "renewal", "inspection"),
+        "checklist_type",
+    )
+
     async with acquire() as conn:
-        # Verify business type exists
         exists = await conn.fetchval(
             "SELECT 1 FROM business_categories WHERE category_code = $1",
-            business_type.upper(),
+            p["business_type"].upper(),
         )
         if not exists:
             return not_found_envelope(
                 _TOOL_CHECKLIST,
-                f"Business type '{business_type}' not found.",
+                f"Business type '{p['business_type']}' not found.",
             )
 
         steps = await conn.fetch(
@@ -182,11 +209,10 @@ async def get_registration_checklist(
                FROM registration_steps
                WHERE category_code = $1 AND action_type = $2
                ORDER BY step_number""",
-            business_type.upper(),
-            checklist_type,
+            p["business_type"].upper(),
+            p["checklist_type"],
         )
 
-        # Flatten required_documents arrays into checklist items
         items = []
         for step in steps:
             docs = step["required_documents"] or []
@@ -195,19 +221,20 @@ async def get_registration_checklist(
                     "item": doc,
                     "step": step["step_number"],
                     "step_title": step["step_title"],
-                    "is_mandatory": True,  # all required_documents are mandatory
+                    "is_mandatory": True,
                 })
 
         return build_envelope(
             tool_name=_TOOL_CHECKLIST,
             status="success",
             data={
-                "business_type": business_type.upper(),
-                "checklist_type": checklist_type,
+                "business_type": p["business_type"].upper(),
+                "checklist_type": p["checklist_type"],
                 "total_items": len(items),
                 "mandatory_items": sum(1 for i in items if i["is_mandatory"]),
                 "items": items,
             },
             source_type="database",
             source_documents=[],
+            confidence="high",
         )

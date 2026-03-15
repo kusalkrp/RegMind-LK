@@ -21,6 +21,16 @@ _REDACTED_KEYS = frozenset({
     "secret", "api_key", "authorization", "cookie",
 })
 
+# Standard LogRecord attribute names — never treated as "extra" fields
+_STANDARD_RECORD_KEYS = frozenset({
+    "name", "msg", "args", "levelname", "levelno", "pathname", "filename",
+    "module", "exc_info", "exc_text", "stack_info", "lineno", "funcName",
+    "created", "msecs", "relativeCreated", "thread", "threadName",
+    "processName", "process", "message", "taskName",
+    # Internal formatter attributes
+    "getMessage",
+})
+
 
 class _JsonFormatter(logging.Formatter):
     """Emit one JSON object per log record to stdout."""
@@ -34,10 +44,22 @@ class _JsonFormatter(logging.Formatter):
             "event": record.getMessage(),
         }
 
-        # Pull structured extras attached by log_tool_call()
+        # Pull the four named structured extras set by log_tool_call()
         for field in ("trace_id", "tool_name", "duration_ms", "error"):
             if hasattr(record, field):
                 entry[field] = getattr(record, field)
+
+        # Pull any additional extra fields, redacting sensitive ones
+        for key, val in record.__dict__.items():
+            if key in _STANDARD_RECORD_KEYS or key.startswith("_"):
+                continue
+            if key in entry:  # already handled above
+                continue
+            # Redact any key whose name contains a sensitive substring
+            if any(redact_word in key.lower() for redact_word in _REDACTED_KEYS):
+                entry[key] = "[REDACTED]"
+            else:
+                entry[key] = val
 
         if record.exc_info:
             entry["exception"] = self.formatException(record.exc_info)
@@ -87,3 +109,34 @@ def log_tool_call(
         logger.error("tool_call status=%s", status, extra=extra)
     else:
         logger.info("tool_call status=%s", status, extra=extra)
+
+
+def log_cost_estimate(
+    logger: logging.Logger,
+    tool_name: str,
+    embedding_calls: int,
+    synthesis_calls: int,
+    embedding_tokens_estimate: int = 500,   # rough: avg short query
+    synthesis_tokens_estimate: int = 2000,  # rough: context + response
+) -> None:
+    """
+    Emit a structured cost-estimate log record.
+    Uses rough token estimates; not a billing-accurate figure.
+    Rates: $0.00001/embedding token, $0.000001/synthesis token.
+    Never raises — failure is silently swallowed.
+    """
+    try:
+        embedding_cost = embedding_calls * embedding_tokens_estimate * 0.00001
+        synthesis_cost = synthesis_calls * synthesis_tokens_estimate * 0.000001
+        total_cost = embedding_cost + synthesis_cost
+        logger.info(
+            "cost_estimate",
+            extra={
+                "tool_name": tool_name,
+                "cost_usd_estimate": round(total_cost, 8),
+                "embedding_calls": embedding_calls,
+                "synthesis_calls": synthesis_calls,
+            },
+        )
+    except Exception as exc:
+        logger.warning("log_cost_estimate failed (non-critical): %s", exc)

@@ -11,7 +11,10 @@ from typing import Any
 
 from sltda_mcp.database import acquire
 from sltda_mcp.mcp_server.rag import run_rag
-from sltda_mcp.mcp_server.tools.base import build_envelope, not_found_envelope
+from sltda_mcp.mcp_server.tools.base import (
+    build_envelope,
+    validate_tool_inputs,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,15 +33,18 @@ async def get_investment_process(
 
     Call this when an investor or developer asks how to invest in, establish,
     or get approval for a tourism project in Sri Lanka.
+    Do NOT use this for tax concessions, levy clearance, or financial facility
+    details — use financial_concessions or tdl_information.
     """
+    p = validate_tool_inputs({"project_type": project_type})
+
     query = (
-        f"investment process for {project_type} tourism project in Sri Lanka"
-        if project_type
+        f"investment process for {p['project_type']} tourism project in Sri Lanka"
+        if p["project_type"]
         else "investment process tourism business registration SLTDA investor unit"
     )
 
     async with acquire() as conn:
-        # Fetch any structured investor steps if they exist
         steps = await conn.fetch(
             """SELECT step_number, step_title, step_description,
                       required_documents, fees
@@ -49,7 +55,6 @@ async def get_investment_process(
                LIMIT 20""",
         )
 
-        # Forms related to investment
         form_docs = await conn.fetch(
             """SELECT document_name, source_url
                FROM documents
@@ -59,7 +64,6 @@ async def get_investment_process(
                LIMIT 5""",
         )
 
-    # RAG for investor unit / BOI details
     rag_result = await run_rag(query=query)
 
     source_docs = [
@@ -74,7 +78,7 @@ async def get_investment_process(
         tool_name=_TOOL_INVEST,
         status="success",
         data={
-            "project_type": project_type,
+            "project_type": p["project_type"],
             "structured_steps": [dict(s) for s in steps],
             "investor_guidance": rag_result.answer,
             "rag_confidence": rag_result.confidence,
@@ -101,35 +105,41 @@ async def search_sltda_resources(
 
     Call this when a user's question doesn't clearly match a specific tool,
     or when they need to discover what SLTDA documents cover a given topic.
-    Use specific tools (registration_requirements, tdl_information, etc.)
-    when the intent is clear — they are faster and more accurate.
+    Do NOT use this when the user's intent clearly matches a specific tool
+    (e.g., registration steps, TDL rates, annual reports) — use the specific
+    tool instead for better accuracy and speed.
 
     top_k is capped at 7 (Issue #14).
     """
+    p = validate_tool_inputs(
+        {"query": query, "section_filter": section_filter,
+         "document_type_filter": document_type_filter},
+        required=frozenset({"query"}),
+    )
+
     effective_k = min(top_k, _TOP_K_MAX)
     if top_k > _TOP_K_MAX:
         logger.info("search_sltda_resources: top_k capped from %d to %d", top_k, _TOP_K_MAX)
 
     rag_result = await run_rag(
-        query=query,
-        section_filter=section_filter,
-        document_type_filter=document_type_filter,
+        query=p["query"],
+        section_filter=p["section_filter"],
+        document_type_filter=p["document_type_filter"],
         top_k=effective_k,
     )
 
-    # Gemini query intent interpretation (brief, reuses synthesis semaphore)
-    query_interpreted_as = query  # default: use original
+    query_interpreted_as = p["query"]
     if rag_result.synthesis_used:
         query_interpreted_as = (
-            f"Query interpreted as: {query}"
-            + (f" (expanded)" if rag_result.query_expanded else "")
+            f"Query interpreted as: {p['query']}"
+            + (" (expanded)" if rag_result.query_expanded else "")
         )
 
     return build_envelope(
         tool_name=_TOOL_SEARCH,
         status="success" if rag_result.chunks else "not_found",
         data={
-            "query": query,
+            "query": p["query"],
             "query_interpreted_as": query_interpreted_as,
             "top_k_requested": top_k,
             "top_k_used": effective_k,
@@ -137,7 +147,7 @@ async def search_sltda_resources(
             "answer": rag_result.answer,
             "results": [
                 {
-                    "text": c.chunk_text,     # already truncated to 500 chars
+                    "text": c.chunk_text,
                     "document_name": c.document_name,
                     "source_url": c.source_url,
                     "score": round(c.score, 3),
