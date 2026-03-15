@@ -10,7 +10,8 @@ from typing import Any, AsyncIterator, Literal
 
 from fastmcp import FastMCP
 
-from sltda_mcp.config import configure_logging, get_settings
+from sltda_mcp.config import get_settings
+from sltda_mcp.logging_config import configure_json_logging
 from sltda_mcp.database import close_pool, init_pool
 from sltda_mcp.mcp_server.health import health_check
 from sltda_mcp.mcp_server.tools.financial import (
@@ -47,7 +48,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def _lifespan(app: FastMCP) -> AsyncIterator[None]:  # type: ignore[type-arg]
     settings = get_settings()
-    configure_logging(settings.log_level)
+    configure_json_logging(settings.log_level)
 
     logger.info("sltda-mcp starting up")
     await init_pool()

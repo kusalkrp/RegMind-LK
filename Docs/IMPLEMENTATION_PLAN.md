@@ -1371,7 +1371,7 @@ test_health_includes_cutover_status
 - [ ] `curl http://localhost:8001/health | python -m json.tool` → valid JSON, all fields present
 - [ ] Status = `healthy` with all components running
 - [ ] Kill postgres container → health returns `unhealthy` within 15s
-- [ ] `pytest tests/unit/test_health.py -v` → all pass
+- [x] `pytest tests/unit/test_health.py -v` → all pass
 - [ ] Log output is valid JSON (check with `docker compose logs sltda-mcp | python -m json.tool`)
 
 ---
@@ -1761,7 +1761,7 @@ Update task checkboxes as phases are completed. This file is the single source o
 | Phase 6 — Orchestrator & Cutover | ✅ Complete | 2026-03-15 |
 | Phase 7 — Structured MCP Tools | ✅ Complete | 2026-03-15 |
 | Phase 8 — RAG Tools | ✅ Complete | 2026-03-15 |
-| Phase 9 — Observability | ⬜ Not started | — |
+| Phase 9 — Observability | ✅ Complete | 2026-03-15 |
 | Phase 10 — Full Test Suite | ⬜ Not started | — |
 | Phase 11 — Production Hardening | ⬜ Not started | — |
 | Phase 12 — Demo & Integration | ⬜ Not started | — |
