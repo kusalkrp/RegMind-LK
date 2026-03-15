@@ -1,0 +1,142 @@
+[
+  {
+    "id": 1,
+    "query": "What is the Tourism Development Levy rate for small hotels?",
+    "expected_keywords": ["TDL", "levy", "rate", "percent"],
+    "source_document": "TDL Circular",
+    "tool": "get_tdl_information"
+  },
+  {
+    "id": 2,
+    "query": "What are Sri Lanka's tourism strategic goals for 2025?",
+    "expected_keywords": ["strategic", "target", "2025", "arrivals"],
+    "source_document": "Strategic Plan 2022-2025",
+    "tool": "get_strategic_plan"
+  },
+  {
+    "id": 3,
+    "query": "What documents do I need to register a guest house?",
+    "expected_keywords": ["documents", "registration", "certificate", "application"],
+    "source_document": "Guest House Registration Checklist",
+    "tool": "get_registration_checklist"
+  },
+  {
+    "id": 4,
+    "query": "How do I get a TDL clearance certificate?",
+    "expected_keywords": ["clearance", "certificate", "Tourism Development Levy", "process"],
+    "source_document": "TDL Circular",
+    "tool": "get_tdl_information"
+  },
+  {
+    "id": 5,
+    "query": "What are the SLTDA classification standards for boutique villas?",
+    "expected_keywords": ["boutique", "villa", "classification", "standards"],
+    "source_document": "Boutique Villa Gazette",
+    "tool": "get_accommodation_standards"
+  },
+  {
+    "id": 6,
+    "query": "What interest rate concessions are available for hotel construction?",
+    "expected_keywords": ["interest", "concession", "hotel", "banking"],
+    "source_document": "Banking Circular",
+    "tool": "get_financial_concessions"
+  },
+  {
+    "id": 7,
+    "query": "What are the steps to register a travel agency with SLTDA?",
+    "expected_keywords": ["steps", "travel", "agency", "register"],
+    "source_document": "Travel Agent Registration Guidelines",
+    "tool": "get_registration_requirements"
+  },
+  {
+    "id": 8,
+    "query": "Which sections of the Tourism Act govern accommodation providers?",
+    "expected_keywords": ["section", "act", "accommodation", "provider"],
+    "source_document": "Tourism Act No. 38 of 2005",
+    "tool": "get_tourism_act_provisions"
+  },
+  {
+    "id": 9,
+    "query": "What eco tourism guidelines does SLTDA provide?",
+    "expected_keywords": ["eco", "tourism", "guidelines", "environment"],
+    "source_document": "Eco Tourism Toolkit",
+    "tool": "get_niche_toolkit"
+  },
+  {
+    "id": 10,
+    "query": "What is the process for foreign investors to open a hotel in Sri Lanka?",
+    "expected_keywords": ["investor", "foreign", "hotel", "process"],
+    "source_document": "Investor Guidelines",
+    "tool": "get_investment_process"
+  },
+  {
+    "id": 11,
+    "query": "What are the latest tourist arrival statistics for Sri Lanka?",
+    "expected_keywords": ["arrivals", "statistics", "tourists", "report"],
+    "source_document": "Monthly Arrivals Report",
+    "tool": "get_latest_arrivals_report"
+  },
+  {
+    "id": 12,
+    "query": "What tax exemptions are available for new tourism businesses?",
+    "expected_keywords": ["tax", "exemption", "new", "business"],
+    "source_document": "Tax Concessions Circular",
+    "tool": "get_tax_rate"
+  },
+  {
+    "id": 13,
+    "query": "What are the MICE tourism opportunities in Sri Lanka?",
+    "expected_keywords": ["MICE", "meetings", "conferences", "business"],
+    "source_document": "MICE Tourism Toolkit",
+    "tool": "get_niche_toolkit"
+  },
+  {
+    "id": 14,
+    "query": "How many rooms are required for a boutique hotel classification?",
+    "expected_keywords": ["rooms", "boutique", "hotel", "classification"],
+    "source_document": "Boutique Hotel Gazette",
+    "tool": "get_accommodation_standards"
+  },
+  {
+    "id": 15,
+    "query": "What are the renewal requirements for a hotel licence?",
+    "expected_keywords": ["renewal", "hotel", "licence", "requirements"],
+    "source_document": "Hotel Registration Guidelines",
+    "tool": "get_registration_requirements"
+  },
+  {
+    "id": 16,
+    "query": "What are the SLTDA annual report findings for 2022?",
+    "expected_keywords": ["annual", "report", "2022", "SLTDA"],
+    "source_document": "SLTDA Annual Report 2022",
+    "tool": "get_annual_report"
+  },
+  {
+    "id": 17,
+    "query": "What penalties apply for operating a tourism business without SLTDA registration?",
+    "expected_keywords": ["penalty", "offence", "unregistered", "act"],
+    "source_document": "Tourism Act No. 38 of 2005",
+    "tool": "get_tourism_act_provisions"
+  },
+  {
+    "id": 18,
+    "query": "What are the guidelines for adventure tourism operators in Sri Lanka?",
+    "expected_keywords": ["adventure", "tourism", "operator", "guidelines"],
+    "source_document": "Adventure Tourism Toolkit",
+    "tool": "get_niche_toolkit"
+  },
+  {
+    "id": 19,
+    "query": "Are there moratoriums on loan repayments for tourism businesses affected by COVID?",
+    "expected_keywords": ["moratorium", "loan", "repayment", "tourism"],
+    "source_document": "Banking Circular",
+    "tool": "get_financial_concessions"
+  },
+  {
+    "id": 20,
+    "query": "What wellness tourism standards does SLTDA recognise?",
+    "expected_keywords": ["wellness", "ayurvedic", "health", "tourism"],
+    "source_document": "Wellness Tourism Toolkit",
+    "tool": "get_niche_toolkit"
+  }
+]

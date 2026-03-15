@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "sltda": {
+      "command": "docker",
+      "args": [
+        "run", "--rm", "-i",
+        "--network", "sltda-mcp_default",
+        "-e", "POSTGRES_URL=postgresql+asyncpg://sltda:changeme@postgres:5432/sltda_mcp",
+        "-e", "QDRANT_URL=http://qdrant:6333",
+        "-e", "GEMINI_API_KEY=<your-key>",
+        "sltda-mcp:latest",
+        "python", "-m", "sltda_mcp.mcp_server.stdio"
+      ]
+    }
+  }
+}

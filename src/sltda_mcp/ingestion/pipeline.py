@@ -17,6 +17,7 @@ from qdrant_client import QdrantClient
 from sltda_mcp.config import get_settings
 from sltda_mcp.database import acquire, init_pool
 from sltda_mcp.exceptions import CutoverError, IngestionError
+from sltda_mcp.notifications import notify_ingestion_complete, notify_ingestion_failed
 from sltda_mcp.ingestion.change_detector import ChangeType, detect_changes, write_manifest
 from sltda_mcp.ingestion.chunker import chunk_document
 from sltda_mcp.ingestion.cutover import execute_cutover
@@ -221,138 +222,159 @@ async def run_pipeline(dry_run: bool = False) -> dict[str, Any]:
 
     qdrant_sync_client = QdrantClient(url=settings.qdrant_url)
 
+    # Acquire advisory lock to prevent concurrent pipeline runs
+    # Lock ID 7734265 is a fixed arbitrary constant for this pipeline
+    _PIPELINE_LOCK_ID = 7734265
+
     async with acquire() as conn:
-        # ── Step 1: Scrape ────────────────────────────────────────────────────
-        await _update_pipeline_state(conn, run_id, 1, "running", "scraping document list")
-        candidates = await scrape_document_list()
-        await _update_pipeline_state(conn, run_id, 1, "done", f"{len(candidates)} candidates")
-        logger.info("Step 1 done: %d candidate documents", len(candidates))
-
-        # ── Step 2: Change detection ──────────────────────────────────────────
-        await _update_pipeline_state(conn, run_id, 2, "running")
-        manifests_dir = Path(settings.documents_base_path) / "manifests"
-        changes = detect_changes(candidates, manifests_dir)
-        to_process = [c for c in changes if c.change_type in (ChangeType.NEW, ChangeType.MODIFIED)]
-        await _update_pipeline_state(conn, run_id, 2, "done", f"{len(to_process)} to process")
-        logger.info("Step 2 done: %d new/modified documents", len(to_process))
-
-        if not to_process:
-            logger.info("No changes detected — pipeline complete")
-            return {"run_id": run_id, "status": "no_changes", "processed": 0}
-
-        # ── Step 3: Download ──────────────────────────────────────────────────
-        await _update_pipeline_state(conn, run_id, 3, "running")
-        batch_result = await download_documents([c.candidate for c in to_process])
-        successful = [r for r in batch_result.results if r.status == DownloadStatus.SUCCESS]
-        await _update_pipeline_state(
-            conn, run_id, 3, "done",
-            f"{len(successful)}/{len(to_process)} downloaded"
+        acquired = await conn.fetchval(
+            "SELECT pg_try_advisory_lock($1)", _PIPELINE_LOCK_ID
         )
-        logger.info("Step 3 done: %d/%d downloaded", len(successful), len(to_process))
-
-        # ── Steps 4–10: Format/Extract/Chunk/Embed/Upsert/PGSync ─────────────
-        await _update_pipeline_state(conn, run_id, 4, "running", "extract/chunk/embed loop")
-
-        # Wipe + recreate staging collection before any upserts (Issue #5)
-        ensure_staging_collection(qdrant_sync_client)
-
-        all_chunks = []
-        parse_failures = 0
-
-        for change in to_process:
-            try:
-                _count, doc_chunks = await _process_document(conn, qdrant_sync_client, change, run_id)
-                all_chunks.extend(doc_chunks)
-            except Exception as exc:
-                parse_failures += 1
-                logger.error(
-                    "Document processing failed for %s: %s",
-                    change.candidate.filename, exc, exc_info=True,
-                )
-
-        failure_rate = parse_failures / max(len(to_process), 1)
-        if failure_rate > _ABORT_THRESHOLD:
-            msg = (
-                f"Abort: {failure_rate:.1%} parse failure rate exceeds "
-                f"{_ABORT_THRESHOLD:.0%} threshold"
-            )
-            await _update_pipeline_state(conn, run_id, 4, "aborted", msg)
-            raise IngestionError(msg)
-
-        await _update_pipeline_state(
-            conn, run_id, 4, "done",
-            f"{len(all_chunks)} chunks, {parse_failures} failures"
-        )
-
-        # ── Step 8: Embed ─────────────────────────────────────────────────────
-        await _update_pipeline_state(conn, run_id, 8, "running", "embedding chunks")
-        embedded = await embed_chunks(all_chunks, conn=conn, run_id=run_id)
-        await _update_pipeline_state(conn, run_id, 8, "done", f"{len(embedded)} embedded")
-
-        # ── Step 9: Qdrant upsert ─────────────────────────────────────────────
-        await _update_pipeline_state(conn, run_id, 9, "running", "upserting to Qdrant staging")
-        upsert_chunks(qdrant_sync_client, embedded)
-
-        # Verify point count within tolerance
-        from qdrant_client.http.exceptions import UnexpectedResponse
+        if not acquired:
+            logger.warning("Another ingestion pipeline is already running — aborting duplicate run")
+            return {"run_id": run_id, "status": "skipped_duplicate", "processed": 0}
         try:
-            info = qdrant_sync_client.get_collection("sltda_documents_next")
-            actual = info.points_count or 0
-        except UnexpectedResponse:
-            actual = 0
+            # ── Step 1: Scrape ────────────────────────────────────────────────────
+            await _update_pipeline_state(conn, run_id, 1, "running", "scraping document list")
+            candidates = await scrape_document_list()
+            await _update_pipeline_state(conn, run_id, 1, "done", f"{len(candidates)} candidates")
+            logger.info("Step 1 done: %d candidate documents", len(candidates))
 
-        expected = len(embedded)
-        if expected > 0:
-            deviation = abs(actual - expected) / expected
-            if deviation > _QDRANT_TOLERANCE:
+            # ── Step 2: Change detection ──────────────────────────────────────────
+            await _update_pipeline_state(conn, run_id, 2, "running")
+            manifests_dir = Path(settings.documents_base_path) / "manifests"
+            changes = detect_changes(candidates, manifests_dir)
+            to_process = [c for c in changes if c.change_type in (ChangeType.NEW, ChangeType.MODIFIED)]
+            await _update_pipeline_state(conn, run_id, 2, "done", f"{len(to_process)} to process")
+            logger.info("Step 2 done: %d new/modified documents", len(to_process))
+
+            if not to_process:
+                logger.info("No changes detected — pipeline complete")
+                return {"run_id": run_id, "status": "no_changes", "processed": 0}
+
+            # ── Step 3: Download ──────────────────────────────────────────────────
+            await _update_pipeline_state(conn, run_id, 3, "running")
+            batch_result = await download_documents([c.candidate for c in to_process])
+            successful = [r for r in batch_result.results if r.status == DownloadStatus.SUCCESS]
+            await _update_pipeline_state(
+                conn, run_id, 3, "done",
+                f"{len(successful)}/{len(to_process)} downloaded"
+            )
+            logger.info("Step 3 done: %d/%d downloaded", len(successful), len(to_process))
+
+            # ── Steps 4–10: Format/Extract/Chunk/Embed/Upsert/PGSync ─────────────
+            await _update_pipeline_state(conn, run_id, 4, "running", "extract/chunk/embed loop")
+
+            # Wipe + recreate staging collection before any upserts (Issue #5)
+            ensure_staging_collection(qdrant_sync_client)
+
+            all_chunks = []
+            parse_failures = 0
+
+            for change in to_process:
+                try:
+                    _count, doc_chunks = await _process_document(conn, qdrant_sync_client, change, run_id)
+                    all_chunks.extend(doc_chunks)
+                except Exception as exc:
+                    parse_failures += 1
+                    logger.error(
+                        "Document processing failed for %s: %s",
+                        change.candidate.filename, exc, exc_info=True,
+                    )
+
+            failure_rate = parse_failures / max(len(to_process), 1)
+            if failure_rate > _ABORT_THRESHOLD:
                 msg = (
-                    f"Abort: Qdrant point count deviation {deviation:.1%} "
-                    f"(expected ~{expected}, got {actual})"
+                    f"Abort: {failure_rate:.1%} parse failure rate exceeds "
+                    f"{_ABORT_THRESHOLD:.0%} threshold"
                 )
-                await _update_pipeline_state(conn, run_id, 9, "aborted", msg)
-                raise IngestionError(msg)
+                await _update_pipeline_state(conn, run_id, 4, "aborted", msg)
+                exc = IngestionError(msg)
+                await notify_ingestion_failed(exc, run_id)
+                raise exc
 
-        await _update_pipeline_state(conn, run_id, 9, "done", f"{actual} points in staging")
+            await _update_pipeline_state(
+                conn, run_id, 4, "done",
+                f"{len(all_chunks)} chunks, {parse_failures} failures"
+            )
 
-        # ── Step 11: Smoke tests ──────────────────────────────────────────────
-        await _update_pipeline_state(conn, run_id, 11, "running", "running smoke tests")
-        failures = await _smoke_tests(conn)
-        if failures:
-            msg = f"Smoke tests failed: {'; '.join(failures)}"
-            await _update_pipeline_state(conn, run_id, 11, "aborted", msg)
-            raise IngestionError(msg)
-        await _update_pipeline_state(conn, run_id, 11, "done", "all smoke tests passed")
+            # ── Step 8: Embed ─────────────────────────────────────────────────────
+            await _update_pipeline_state(conn, run_id, 8, "running", "embedding chunks")
+            embedded = await embed_chunks(all_chunks, conn=conn, run_id=run_id)
+            await _update_pipeline_state(conn, run_id, 8, "done", f"{len(embedded)} embedded")
 
-        # ── Step 12: Cutover ──────────────────────────────────────────────────
-        if dry_run:
-            logger.info("dry_run=True — skipping cutover")
-            await _update_pipeline_state(conn, run_id, 12, "skipped", "dry_run")
-        else:
-            await _update_pipeline_state(conn, run_id, 12, "running", "atomic cutover")
+            # ── Step 9: Qdrant upsert ─────────────────────────────────────────────
+            await _update_pipeline_state(conn, run_id, 9, "running", "upserting to Qdrant staging")
+            upsert_chunks(qdrant_sync_client, embedded)
+
+            # Verify point count within tolerance
+            from qdrant_client.http.exceptions import UnexpectedResponse
             try:
-                await execute_cutover(conn)
-            except CutoverError as exc:
-                await _update_pipeline_state(conn, run_id, 12, "aborted", str(exc))
-                raise
-            await _update_pipeline_state(conn, run_id, 12, "done")
+                info = qdrant_sync_client.get_collection("sltda_documents_next")
+                actual = info.points_count or 0
+            except UnexpectedResponse:
+                actual = 0
 
-        # ── Step 13: Write manifest ───────────────────────────────────────────
-        write_manifest(candidates, manifests_dir, run_id)
-        await _update_pipeline_state(conn, run_id, 13, "done", "manifest written")
+            expected = len(embedded)
+            if expected > 0:
+                deviation = abs(actual - expected) / expected
+                if deviation > _QDRANT_TOLERANCE:
+                    msg = (
+                        f"Abort: Qdrant point count deviation {deviation:.1%} "
+                        f"(expected ~{expected}, got {actual})"
+                    )
+                    await _update_pipeline_state(conn, run_id, 9, "aborted", msg)
+                    exc = IngestionError(msg)
+                    await notify_ingestion_failed(exc, run_id)
+                    raise exc
 
-        summary = {
-            "run_id": run_id,
-            "status": "complete",
-            "candidates": len(candidates),
-            "downloaded": len(successful),
-            "processed": len(to_process) - parse_failures,
-            "parse_failures": parse_failures,
-            "chunks_embedded": len(embedded),
-            "qdrant_points": actual if not dry_run else expected,
-            "dry_run": dry_run,
-        }
-        logger.info("Pipeline run %s complete: %s", run_id, summary)
-        return summary
+            await _update_pipeline_state(conn, run_id, 9, "done", f"{actual} points in staging")
+
+            # ── Step 11: Smoke tests ──────────────────────────────────────────────
+            await _update_pipeline_state(conn, run_id, 11, "running", "running smoke tests")
+            failures = await _smoke_tests(conn)
+            if failures:
+                msg = f"Smoke tests failed: {'; '.join(failures)}"
+                await _update_pipeline_state(conn, run_id, 11, "aborted", msg)
+                exc = IngestionError(msg)
+                await notify_ingestion_failed(exc, run_id)
+                raise exc
+            await _update_pipeline_state(conn, run_id, 11, "done", "all smoke tests passed")
+
+            # ── Step 12: Cutover ──────────────────────────────────────────────────
+            if dry_run:
+                logger.info("dry_run=True — skipping cutover")
+                await _update_pipeline_state(conn, run_id, 12, "skipped", "dry_run")
+            else:
+                await _update_pipeline_state(conn, run_id, 12, "running", "atomic cutover")
+                try:
+                    await execute_cutover(conn)
+                except CutoverError as exc:
+                    await _update_pipeline_state(conn, run_id, 12, "aborted", str(exc))
+                    await notify_ingestion_failed(exc, run_id)
+                    raise
+                await _update_pipeline_state(conn, run_id, 12, "done")
+
+            # ── Step 13: Write manifest ───────────────────────────────────────────
+            write_manifest(candidates, manifests_dir, run_id)
+            await _update_pipeline_state(conn, run_id, 13, "done", "manifest written")
+
+            summary = {
+                "run_id": run_id,
+                "status": "complete",
+                "candidates": len(candidates),
+                "downloaded": len(successful),
+                "processed": len(to_process) - parse_failures,
+                "parse_failures": parse_failures,
+                "chunks_embedded": len(embedded),
+                "qdrant_points": actual if not dry_run else expected,
+                "dry_run": dry_run,
+            }
+            logger.info("Pipeline run %s complete: %s", run_id, summary)
+            await notify_ingestion_complete(summary)
+            return summary
+        finally:
+            await conn.execute("SELECT pg_advisory_unlock($1)", _PIPELINE_LOCK_ID)
 
 
 if __name__ == "__main__":

@@ -42,6 +42,7 @@ dependencies = [
     "tenacity==8.3.0",
     # Caching
     "cachetools==5.3.3",
+    "redis[asyncio]==5.0.3",
 ]
 
 [project.optional-dependencies]

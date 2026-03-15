@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_DB: sltda_mcp
       POSTGRES_USER: sltda
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./migrations:/docker-entrypoint-initdb.d:ro
@@ -42,6 +42,23 @@ services:
         max-size: "50m"
         max-file: "3"
 
+  redis:
+    image: redis:7.2-alpine
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save ""
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
+
   sltda-mcp:
     build:
       context: .
@@ -52,10 +69,13 @@ services:
         condition: service_healthy
       qdrant:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8001:8001"
     environment:
-      POSTGRES_URL: postgresql+asyncpg://sltda:${POSTGRES_PASSWORD:-changeme}@postgres:5432/sltda_mcp
+      POSTGRES_URL: postgresql+asyncpg://sltda:${POSTGRES_PASSWORD}@postgres:5432/sltda_mcp
+      REDIS_URL: redis://redis:6379/0
       QDRANT_URL: http://qdrant:6333
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       MCP_MAX_CONCURRENCY: ${MCP_MAX_CONCURRENCY:-15}
@@ -92,7 +112,7 @@ services:
       qdrant:
         condition: service_healthy
     environment:
-      POSTGRES_URL: postgresql+asyncpg://sltda:${POSTGRES_PASSWORD:-changeme}@postgres:5432/sltda_mcp
+      POSTGRES_URL: postgresql+asyncpg://sltda:${POSTGRES_PASSWORD}@postgres:5432/sltda_mcp
       QDRANT_URL: http://qdrant:6333
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       INGESTION_RATE_LIMIT_RPS: ${INGESTION_RATE_LIMIT_RPS:-1.0}

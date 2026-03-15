@@ -98,6 +98,13 @@ async def execute_cutover(conn: asyncpg.Connection) -> None:
     await _set_cutover_status(conn, "complete")
     logger.info("Cutover complete. Rollback window open for 48 hours.")
 
+    # Invalidate in-process RAG caches so next requests see fresh data
+    try:
+        from sltda_mcp.mcp_server.rag import invalidate_rag_cache
+        invalidate_rag_cache()
+    except Exception:
+        pass  # mcp_server may not be running in ingestion container
+
 
 async def execute_rollback(conn: asyncpg.Connection) -> None:
     """
