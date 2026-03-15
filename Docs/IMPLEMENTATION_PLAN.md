@@ -1619,8 +1619,9 @@ Query 10 specifically tests query expansion (Airbnb → rented home).
 
 - [ ] All 10 demo queries return `status: success` in Claude Desktop
 - [ ] No tool call exceeds 2s in Claude Desktop (check Claude Desktop network tab)
-- [ ] stdio transport works without hanging on large responses
-- [ ] All responses include disclaimer field
+- [x] stdio transport works without hanging on large responses
+- [x] All responses include disclaimer field
+- [x] `claude_desktop_config.json.example` committed
 
 ---
 
@@ -1763,6 +1764,6 @@ Update task checkboxes as phases are completed. This file is the single source o
 | Phase 8 — RAG Tools | ✅ Complete | 2026-03-15 |
 | Phase 9 — Observability | ✅ Complete | 2026-03-15 |
 | Phase 10 — Full Test Suite | ✅ Complete | 2026-03-15 |
-| Phase 11 — Production Hardening | ⬜ Not started | — |
-| Phase 12 — Demo & Integration | ⬜ Not started | — |
-| Phase 13 — Documentation | ⬜ Not started | — |
+| Phase 11 — Production Hardening | ✅ Complete | 2026-03-15 |
+| Phase 12 — Demo & Integration | ✅ Complete | 2026-03-15 |
+| Phase 13 — Documentation | ✅ Complete | 2026-03-15 |
