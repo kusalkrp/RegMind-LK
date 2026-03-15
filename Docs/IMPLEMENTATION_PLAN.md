@@ -179,22 +179,22 @@ G:\RegMind-LK\
 
 ### Tasks
 
-- [ ] Create `CLAUDE.md` (project-specific, not template)
-- [ ] Create `IMPLEMENTATION_PLAN.md` (this file)
-- [ ] Create `pyproject.toml` with all dependencies pinned to exact versions
-- [ ] Create `.env.example` with every required variable documented
-- [ ] Add `.env` to `.gitignore` immediately
-- [ ] Create `src/sltda_mcp/__init__.py` and package skeleton
-- [ ] Create `migrations/` directory
-- [ ] Create `documents/raw`, `documents/parsed`, `documents/chunks`, `documents/manifests` directories
-- [ ] Create `ingestion/config/` with three YAML files
+- [x] Create `CLAUDE.md` (project-specific, not template)
+- [x] Create `IMPLEMENTATION_PLAN.md` (this file)
+- [x] Create `pyproject.toml` with all dependencies pinned to exact versions
+- [x] Create `.env.example` with every required variable documented
+- [x] Add `.env` to `.gitignore` immediately
+- [x] Create `src/sltda_mcp/__init__.py` and package skeleton
+- [x] Create `migrations/` directory
+- [x] Create `documents/raw`, `documents/parsed`, `documents/chunks`, `documents/manifests` directories
+- [x] Create `ingestion/config/` with three YAML files
 
 ### Definition of Done
 
-- [ ] `git status` shows `.env` is not tracked
-- [ ] `pip install -e ".[dev]"` completes without errors
-- [ ] All YAML configs are valid (`python -c "import yaml; yaml.safe_load(open('ingestion/config/format_strategies.yaml'))"`)
-- [ ] No `<placeholder>` text remains in any file
+- [x] `git status` shows `.env` is not tracked
+- [x] `pip install -e ".[dev]"` completes without errors
+- [x] All YAML configs are valid (`python -c "import yaml; yaml.safe_load(open('ingestion/config/format_strategies.yaml'))"`)
+- [x] No `<placeholder>` text remains in any file
 
 ---
 
@@ -312,7 +312,7 @@ All of the following must pass before proceeding to Phase 2:
 - [ ] `psql $POSTGRES_URL -c "\dt" | wc -l` → 18+ tables
 - [ ] `psql $POSTGRES_URL -c "SELECT cutover_status FROM system_metadata;"` → `none`
 - [ ] Qdrant: `sltda_documents` and `format_exemplars` collections exist
-- [ ] `python -m pytest tests/unit/test_config.py -v` → all pass (write this test: asserts all required settings load)
+- [x] `python -m pytest tests/unit/test_config.py -v` → all pass (write this test: asserts all required settings load)
 
 ---
 
@@ -435,7 +435,7 @@ test_removed_document_detected
 - [ ] `documents/manifests/{today}_manifest.json` exists and is valid JSON
 - [ ] No file in `documents/raw/` is < 5KB
 - [ ] No file in `documents/raw/` starts with `<html`
-- [ ] `python -m pytest tests/unit/test_scraper.py tests/unit/test_downloader.py tests/unit/test_change_detector.py -v` → all pass
+- [x] `python -m pytest tests/unit/test_scraper.py tests/unit/test_downloader.py tests/unit/test_change_detector.py -v` → all pass
 - [ ] Log shows no more than 5% download failures
 
 ---
@@ -657,8 +657,8 @@ test_unextractable_document_excluded
 
 ### 3.5 Validation Gate — Phase 3
 
-- [ ] `pytest tests/unit/test_format_identifier.py -v` → all pass
-- [ ] `pytest tests/unit/test_extractors.py -v` → all pass
+- [x] `pytest tests/unit/test_format_identifier.py -v` → all pass
+- [x] `pytest tests/unit/test_extractors.py -v` → all pass
 - [ ] Format identifier correctly classifies all 11 format families on sample set (manual spot-check with 1 real PDF per family)
 - [ ] `format_review_queue` table receives entries for artificially low-confidence test docs
 - [ ] No extractor silently produces empty output — all failures route to review queue
@@ -786,7 +786,7 @@ test_batch_size_respected
 - [ ] `documents/chunks/` contains one JSON file per document
 - [ ] Qdrant `sltda_documents_next` collection has expected point count (log from embedder)
 - [ ] No duplicate point IDs in collection (`GET /collections/sltda_documents_next` point count matches chunker output count)
-- [ ] `pytest tests/unit/test_chunker.py tests/unit/test_embedder.py -v` → all pass
+- [x] `pytest tests/unit/test_chunker.py tests/unit/test_embedder.py -v` → all pass
 - [ ] Manual: retrieve 3 chunks from Qdrant, confirm payload fields all present
 
 ---
@@ -859,7 +859,7 @@ test_niche_toolkit_summary_generated
 - [ ] `psql $POSTGRES_URL -c "SELECT COUNT(*) FROM niche_toolkits_staging WHERE summary IS NOT NULL;"` → > 0
 - [ ] Manual spot-check: 5 random `registration_steps_staging` rows verified against source PDFs
 - [ ] Manual spot-check: 3 random `business_categories_staging` rows verified (no misaligned gazette references)
-- [ ] `pytest tests/unit/test_pg_sync.py -v` → all pass
+- [x] `pytest tests/unit/test_pg_sync.py -v` → all pass
 
 ---
 
@@ -971,7 +971,7 @@ test_write_jobs_blocked_during_rollback_window
 - [ ] After cutover: `SELECT cutover_status FROM system_metadata` → `complete`
 - [ ] `documents_old` table exists immediately after cutover
 - [ ] MCP server (if running) continues serving queries during cutover (manual test)
-- [ ] `pytest tests/unit/test_cutover.py -v` → all pass
+- [x] `pytest tests/unit/test_cutover.py -v` → all pass
 - [ ] Rollback tested: manually trigger rollback, verify old data restored
 
 ---
@@ -1111,7 +1111,7 @@ Apply same pattern for `test_financial_tools.py` and `test_statistics_tools.py`.
 
 ### 7.7 Validation Gate — Phase 7
 
-- [ ] `pytest tests/unit/test_registration_tools.py tests/unit/test_financial_tools.py tests/unit/test_statistics_tools.py -v` → all pass
+- [x] `pytest tests/unit/test_registration_tools.py tests/unit/test_financial_tools.py tests/unit/test_statistics_tools.py -v` → all pass
 - [ ] Manual Claude Desktop test: ask "how do I register a guest house?" → routes to `get_registration_requirements`, not `get_accommodation_standards`
 - [ ] All 8 structured tools return valid envelope structure
 - [ ] P95 latency < 200ms for all structured tools (run 50 sequential calls, check logs)
@@ -1275,7 +1275,7 @@ Scoring:
 
 ### 8.7 Validation Gate — Phase 8
 
-- [ ] `pytest tests/unit/test_rag.py -v` → all pass
+- [x] `pytest tests/unit/test_rag.py -v` → all pass
 - [ ] `python tests/rag_eval/run_eval.py` → score ≥ 80% (16/20)
 - [ ] All 6 RAG tools return valid envelope structure
 - [ ] P95 latency < 1500ms for RAG tools under normal load
