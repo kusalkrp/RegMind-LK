@@ -5,10 +5,26 @@ Every tool response must go through build_envelope().
 
 import asyncio
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Any
 
 from sltda_mcp.logging_config import log_cost_estimate
+
+_PII_RE = re.compile(
+    r"\b[\w.+-]+@[\w-]+\.[a-z]{2,}\b"   # email
+    r"|\b\d{9,12}\b"                      # NIC / passport numbers (9-12 consecutive digits)
+    r"|\b\+?94\d{9}\b",                   # Sri Lanka phone (+94XXXXXXXXX)
+    re.IGNORECASE,
+)
+
+
+def _redact_params(params: dict) -> dict:
+    """Replace PII patterns in string parameter values before logging."""
+    return {
+        k: _PII_RE.sub("[redacted]", v) if isinstance(v, str) else v
+        for k, v in params.items()
+    }
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +155,7 @@ async def log_invocation(
                (tool_name, input_params, result_status, response_time_ms, called_at)
                VALUES ($1, $2::jsonb, $3, $4, NOW())""",
             tool_name,
-            str(input_params),
+            str(_redact_params(input_params)),
             result_status,
             int(latency_ms),
         )

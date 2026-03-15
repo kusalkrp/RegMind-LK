@@ -18,6 +18,8 @@ from fastmcp import FastMCP
 
 from sltda_mcp.config import get_settings
 from sltda_mcp.database import acquire, close_pool, init_pool
+from sltda_mcp.mcp_server.auth import ApiKeyMiddleware
+from sltda_mcp.mcp_server.rate_limiter import check_rate_limit
 from sltda_mcp.logging_config import configure_json_logging
 from sltda_mcp.mcp_server.health import health_check
 from sltda_mcp.mcp_server.tools.base import log_invocation
@@ -51,27 +53,33 @@ from sltda_mcp.qdrant_client import close_client, init_client, warmup_query
 
 logger = logging.getLogger(__name__)
 
-# ── Rate limiter state ─────────────────────────────────────────────────────────
-_tool_call_counts: dict[str, list[float]] = {}
-_RATE_LIMIT_WINDOW_SECONDS = 60.0
-_RATE_LIMIT_WARN_THRESHOLD = 60
-
-
-def _check_rate_limit(tool_name: str) -> None:
-    """
-    Track calls per tool in a rolling 60-second window.
-    Logs a warning if ≥60 calls are observed (warn-only, does not block).
-    """
-    now = time.monotonic()
-    window_start = now - _RATE_LIMIT_WINDOW_SECONDS
-    calls = _tool_call_counts.get(tool_name, [])
-    calls = [t for t in calls if t >= window_start]
-    calls.append(now)
-    _tool_call_counts[tool_name] = calls
-    if len(calls) >= _RATE_LIMIT_WARN_THRESHOLD:
+async def _enforce_rate_limit(caller_id: str, tool_name: str) -> None:
+    """Block with 429 if caller exceeds per-minute limit. Warn-only if no caller_id."""
+    settings = get_settings()
+    allowed, count = await check_rate_limit(
+        caller_id, tool_name, settings.rate_limit_per_caller_per_minute
+    )
+    if not allowed:
         logger.warning(
-            "rate_limit_warning",
-            extra={"tool_name": tool_name, "calls_in_window": len(calls)},
+            "rate_limit_exceeded",
+            extra={"caller_id": caller_id, "tool_name": tool_name, "count": count},
+        )
+        from sltda_mcp.exceptions import AppBaseError
+        raise AppBaseError(
+            f"Rate limit exceeded: {count} calls to '{tool_name}' in the last 60 seconds. "
+            f"Limit is {settings.rate_limit_per_caller_per_minute}/min."
+        )
+
+
+async def _timed_tool(coro, tool_name: str):
+    """Run a tool coroutine with the configured timeout."""
+    settings = get_settings()
+    try:
+        return await asyncio.wait_for(coro, timeout=settings.mcp_tool_timeout_seconds)
+    except asyncio.TimeoutError:
+        logger.error("tool_timeout", extra={"tool_name": tool_name, "timeout": settings.mcp_tool_timeout_seconds})
+        raise TimeoutError(
+            f"Tool '{tool_name}' exceeded {settings.mcp_tool_timeout_seconds}s timeout."
         )
 
 
@@ -103,6 +111,16 @@ async def _fire_log(
 async def _lifespan(app: FastMCP) -> AsyncIterator[None]:  # type: ignore[type-arg]
     settings = get_settings()
     configure_json_logging(settings.log_level)
+
+    # Attach API key authentication to the FastMCP Starlette app
+    try:
+        if hasattr(app, 'app'):
+            app.app.add_middleware(ApiKeyMiddleware)
+        elif hasattr(app, '_app'):
+            app._app.add_middleware(ApiKeyMiddleware)
+        logger.info("ApiKeyMiddleware attached")
+    except Exception as exc:
+        logger.warning("Could not attach ApiKeyMiddleware (check FastMCP version): %s", exc)
 
     logger.info("sltda-mcp starting up")
     await init_pool()
@@ -144,9 +162,9 @@ async def registration_requirements(
     Do NOT use this for standards or legal classifications — use
     accommodation_standards instead.
     """
-    _check_rate_limit("registration_requirements")
+    await _enforce_rate_limit("anonymous", "registration_requirements")
     start = time.monotonic()
-    result = await get_registration_requirements(business_type, action, language)
+    result = await _timed_tool(get_registration_requirements(business_type, action, language), "registration_requirements")
     latency_ms = (time.monotonic() - start) * 1000
     asyncio.create_task(_fire_log(
         "registration_requirements",
@@ -170,9 +188,9 @@ async def accommodation_standards(
     Use this for standards and legal classifications.
     For the step-by-step registration process, use registration_requirements instead.
     """
-    _check_rate_limit("accommodation_standards")
+    await _enforce_rate_limit("anonymous", "accommodation_standards")
     start = time.monotonic()
-    result = await get_accommodation_standards(category, detail_level)
+    result = await _timed_tool(get_accommodation_standards(category, detail_level), "accommodation_standards")
     latency_ms = (time.monotonic() - start) * 1000
     asyncio.create_task(_fire_log(
         "accommodation_standards",
@@ -196,9 +214,9 @@ async def registration_checklist(
     Call this when a user asks WHAT DOCUMENTS are needed.
     For the full registration process with fees and steps, use registration_requirements.
     """
-    _check_rate_limit("registration_checklist")
+    await _enforce_rate_limit("anonymous", "registration_checklist")
     start = time.monotonic()
-    result = await get_registration_checklist(business_type, checklist_type)
+    result = await _timed_tool(get_registration_checklist(business_type, checklist_type), "registration_checklist")
     latency_ms = (time.monotonic() - start) * 1000
     asyncio.create_task(_fire_log(
         "registration_checklist",
@@ -224,9 +242,9 @@ async def financial_concessions(
     Call this for financial benefits, concessionary loans, or banking facilities.
     For tax rates specifically, use tax_rate instead.
     """
-    _check_rate_limit("financial_concessions")
+    await _enforce_rate_limit("anonymous", "financial_concessions")
     start = time.monotonic()
-    result = await get_financial_concessions(business_type, concession_type)
+    result = await _timed_tool(get_financial_concessions(business_type, concession_type), "financial_concessions")
     latency_ms = (time.monotonic() - start) * 1000
     asyncio.create_task(_fire_log(
         "financial_concessions",
@@ -251,9 +269,9 @@ async def tdl_information(
     Call this for any question about TDL — what it is, the rate, how to get
     clearance, or what documents are needed for clearance.
     """
-    _check_rate_limit("tdl_information")
+    await _enforce_rate_limit("anonymous", "tdl_information")
     start = time.monotonic()
-    result = await get_tdl_information(query_type)
+    result = await _timed_tool(get_tdl_information(query_type), "tdl_information")
     latency_ms = (time.monotonic() - start) * 1000
     asyncio.create_task(_fire_log(
         "tdl_information",
@@ -275,9 +293,9 @@ async def tax_rate(
     Call this for tax rates, tax exemptions, or income tax concessions.
     For broader financial concessions (loans, moratoriums), use financial_concessions.
     """
-    _check_rate_limit("tax_rate")
+    await _enforce_rate_limit("anonymous", "tax_rate")
     start = time.monotonic()
-    result = await get_tax_rate(business_type)
+    result = await _timed_tool(get_tax_rate(business_type), "tax_rate")
     latency_ms = (time.monotonic() - start) * 1000
     asyncio.create_task(_fire_log(
         "tax_rate",
@@ -303,9 +321,9 @@ async def latest_arrivals_report(
     or accommodation occupancy data.
     For full SLTDA annual reports (financials + strategy), use annual_report.
     """
-    _check_rate_limit("latest_arrivals_report")
+    await _enforce_rate_limit("anonymous", "latest_arrivals_report")
     start = time.monotonic()
-    result = await get_latest_arrivals_report(report_type, year)
+    result = await _timed_tool(get_latest_arrivals_report(report_type, year), "latest_arrivals_report")
     latency_ms = (time.monotonic() - start) * 1000
     asyncio.create_task(_fire_log(
         "latest_arrivals_report",
@@ -329,9 +347,9 @@ async def annual_report(
     or audited financial statements for a given year.
     For tourist arrival statistics only, use latest_arrivals_report.
     """
-    _check_rate_limit("annual_report")
+    await _enforce_rate_limit("anonymous", "annual_report")
     start = time.monotonic()
-    result = await get_annual_report(year, language)
+    result = await _timed_tool(get_annual_report(year, language), "annual_report")
     latency_ms = (time.monotonic() - start) * 1000
     asyncio.create_task(_fire_log(
         "annual_report",
@@ -355,9 +373,9 @@ async def strategic_plan(
     Call this for strategic goals, tourism targets, and policy direction.
     For legal provisions of the Tourism Act, use tourism_act_provisions instead.
     """
-    _check_rate_limit("strategic_plan")
+    await _enforce_rate_limit("anonymous", "strategic_plan")
     start = time.monotonic()
-    result = await get_strategic_plan(query, section_focus)
+    result = await _timed_tool(get_strategic_plan(query, section_focus), "strategic_plan")
     latency_ms = (time.monotonic() - start) * 1000
     asyncio.create_task(_fire_log(
         "strategic_plan",
@@ -378,9 +396,9 @@ async def tourism_act_provisions(
     Call this for legal provisions, definitions, offences, and regulatory powers.
     For policy goals, use strategic_plan instead.
     """
-    _check_rate_limit("tourism_act_provisions")
+    await _enforce_rate_limit("anonymous", "tourism_act_provisions")
     start = time.monotonic()
-    result = await get_tourism_act_provisions(topic)
+    result = await _timed_tool(get_tourism_act_provisions(topic), "tourism_act_provisions")
     latency_ms = (time.monotonic() - start) * 1000
     asyncio.create_task(_fire_log(
         "tourism_act_provisions",
@@ -402,9 +420,9 @@ async def niche_categories(
     List all SLTDA-recognised niche tourism categories (eco, MICE, adventure, etc.).
     Use this to discover available categories before drilling in with niche_toolkit.
     """
-    _check_rate_limit("niche_categories")
+    await _enforce_rate_limit("anonymous", "niche_categories")
     start = time.monotonic()
-    result = await get_niche_categories(filter)
+    result = await _timed_tool(get_niche_categories(filter), "niche_categories")
     latency_ms = (time.monotonic() - start) * 1000
     asyncio.create_task(_fire_log(
         "niche_categories",
@@ -426,9 +444,9 @@ async def niche_toolkit(
     Summary mode: fast DB lookup. Full mode: DB + AI-synthesised document detail.
     Use niche_categories first to find the correct category code.
     """
-    _check_rate_limit("niche_toolkit")
+    await _enforce_rate_limit("anonymous", "niche_toolkit")
     start = time.monotonic()
-    result = await get_niche_toolkit(category, detail_level)
+    result = await _timed_tool(get_niche_toolkit(category, detail_level), "niche_toolkit")
     latency_ms = (time.monotonic() - start) * 1000
     asyncio.create_task(_fire_log(
         "niche_toolkit",
@@ -450,9 +468,9 @@ async def investment_process(
     Get the investment process for starting a tourism business in Sri Lanka.
     Call this when an investor asks how to establish or get approval for a tourism project.
     """
-    _check_rate_limit("investment_process")
+    await _enforce_rate_limit("anonymous", "investment_process")
     start = time.monotonic()
-    result = await get_investment_process(project_type)
+    result = await _timed_tool(get_investment_process(project_type), "investment_process")
     latency_ms = (time.monotonic() - start) * 1000
     asyncio.create_task(_fire_log(
         "investment_process",
@@ -476,9 +494,9 @@ async def search_resources(
     Use specific tools when intent is clear — they are faster and more accurate.
     Top_k is capped at 7.
     """
-    _check_rate_limit("search_resources")
+    await _enforce_rate_limit("anonymous", "search_resources")
     start = time.monotonic()
-    result = await search_sltda_resources(query, section_filter, document_type_filter, top_k)
+    result = await _timed_tool(search_sltda_resources(query, section_filter, document_type_filter, top_k), "search_resources")
     latency_ms = (time.monotonic() - start) * 1000
     asyncio.create_task(_fire_log(
         "search_resources",
