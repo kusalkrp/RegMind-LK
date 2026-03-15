@@ -8,29 +8,6 @@
 
 ---
 
-## Progress Tracker
-
-| Phase | Description | Status | Tests | Notes |
-|-------|-------------|--------|-------|-------|
-| 0 | Project Bootstrap | ✅ Complete | — | CLAUDE.md, pyproject, env, package skeleton |
-| 1 | Infrastructure & Data Layer | ✅ Complete | `test_config.py` ✅ | DB pool, Qdrant client, Docker Compose, schema |
-| 2 | Document Acquisition | ✅ Complete | scraper/downloader/change_detector ✅ | Manual: live download not yet run |
-| 3 | Document Intelligence Pipeline | ✅ Complete | format_identifier/extractors ✅ | Manual: PDF spot-check pending |
-| 4 | Chunking, Embedding & Vector Indexing | ✅ Complete | chunker/embedder ✅ | Manual: Qdrant point count pending |
-| 5 | Structured Data → PostgreSQL | ✅ Complete | `test_pg_sync.py` ✅ | Manual: staging row counts pending |
-| 6 | Zero-Downtime Pipeline Orchestrator | ✅ Complete | `test_cutover.py` ✅ | Manual: dry-run & rollback pending |
-| 7 | MCP Server: Structured Tools (Clusters 1–3) | ✅ Complete | registration/financial/statistics ✅ | Manual: Claude Desktop routing pending |
-| 8 | RAG System & AI-Backed Tools (Clusters 4–6) | ✅ Complete | `test_rag.py` ✅ | Manual: RAG eval + latency pending |
-| 9 | Observability & Health | ⬜ Not started | — | Structured logging, /health, Slack alerts |
-| 10 | Full Testing Suite | ⬜ Not started | — | Integration, smoke, load tests |
-| 11 | Production Hardening | ⬜ Not started | — | Issue registry mitigations |
-| 12 | Claude Desktop Integration & Demo | ⬜ Not started | — | stdio config, 10-query demo |
-| 13 | Documentation & Handoff | ⬜ Not started | — | README, ops runbook |
-
-**Last updated:** 2026-03-15 | **Active branch:** `develop`
-
----
-
 ## Prerequisites & Environment Setup
 
 ### Required Tools
@@ -1780,10 +1757,10 @@ Update task checkboxes as phases are completed. This file is the single source o
 | Phase 2 — Acquisition | ✅ Complete | 2026-03-10 |
 | Phase 3 — Intelligence Pipeline | ✅ Complete | 2026-03-10 |
 | Phase 4 — Chunking & Embedding | ✅ Complete | 2026-03-10 |
-| Phase 5 — PG Structured Data | ⬜ Not started | — |
-| Phase 6 — Orchestrator & Cutover | ⬜ Not started | — |
-| Phase 7 — Structured MCP Tools | ⬜ Not started | — |
-| Phase 8 — RAG Tools | ⬜ Not started | — |
+| Phase 5 — PG Structured Data | ✅ Complete | 2026-03-15 |
+| Phase 6 — Orchestrator & Cutover | ✅ Complete | 2026-03-15 |
+| Phase 7 — Structured MCP Tools | ✅ Complete | 2026-03-15 |
+| Phase 8 — RAG Tools | ✅ Complete | 2026-03-15 |
 | Phase 9 — Observability | ⬜ Not started | — |
 | Phase 10 — Full Test Suite | ⬜ Not started | — |
 | Phase 11 — Production Hardening | ⬜ Not started | — |
