@@ -96,6 +96,58 @@ expansions:
     - "agricultural tourism"
     - "farm stay"
 
+  # New mappings — Sri Lankan tourism regulatory terms
+  surfing:
+    - "surfing tourism"
+    - "water sports"
+    - "coastal recreation"
+
+  diving:
+    - "scuba diving"
+    - "underwater tourism"
+    - "marine tourism"
+
+  trekking:
+    - "trekking permit"
+    - "hiking tourism"
+    - "nature trail"
+
+  homestay:
+    - "home stay"
+    - "family accommodation"
+    - "community tourism"
+
+  bungalow:
+    - "heritage bungalow"
+    - "colonial bungalow"
+    - "estate bungalow"
+
+  boat:
+    - "boat safari"
+    - "water excursion"
+    - "boat operator registration"
+
+  travel agent:
+    - "tour operator"
+    - "inbound operator"
+    - "SLTDA licensed agent"
+
+  whale watching:
+    - "whale watching"
+    - "marine mammal tourism"
+    - "Mirissa tourism"
+
+  cultural tourism:
+    - "cultural heritage"
+    - "archaeological tourism"
+    - "UNESCO site"
+
+  investment:
+    - "BOI approval"
+    - "foreign investment"
+    - "tourism project approval"
+    - "SLTDA investor unit"
+
 # Acronym expansions (always applied, no synonym lookup needed)
 acronyms:
   TDL: "Tourism Development Levy"
@@ -103,3 +155,7 @@ acronyms:
   SLBFE: "Sri Lanka Bureau of Foreign Employment"
   BOI: "Board of Investment"
   VAT: "Value Added Tax"
+  EIA: "Environmental Impact Assessment"
+  MOH: "Ministry of Health"
+  UDA: "Urban Development Authority"
+  NHDA: "National Housing Development Authority"
