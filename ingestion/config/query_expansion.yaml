@@ -1,0 +1,105 @@
+# Query Expansion Dictionary
+# Maps colloquial/generic terms → SLTDA regulatory equivalents
+# Used in RAG query preprocessing to improve retrieval recall.
+
+expansions:
+  airbnb:
+    - "rented home"
+    - "rented apartment"
+    - "short-term rental"
+
+  guesthouse:
+    - "guest house"
+    - "boutique hotel"
+
+  hostel:
+    - "hostel"
+    - "budget accommodation"
+
+  bed and breakfast:
+    - "guest house"
+    - "home stay"
+    - "heritage home"
+
+  villa:
+    - "boutique villa"
+    - "serviced apartment"
+
+  eco lodge:
+    - "eco lodge"
+    - "eco-lodge"
+    - "nature-based accommodation"
+
+  spa:
+    - "ayurvedic hotel"
+    - "wellness tourism"
+    - "health tourism"
+
+  permit:
+    - "registration certificate"
+    - "classification certificate"
+    - "tourism establishment"
+
+  tour permit:
+    - "tour guide registration"
+    - "tour operator license"
+
+  tax:
+    - "Tourism Development Levy"
+    - "TDL"
+    - "tax rate"
+    - "financial concessions"
+
+  levy:
+    - "Tourism Development Levy"
+    - "TDL"
+
+  resort:
+    - "classified hotel"
+    - "boutique villa"
+    - "eco lodge"
+
+  camping:
+    - "camping site"
+    - "glamping"
+
+  heritage hotel:
+    - "heritage bungalow"
+    - "heritage home"
+
+  digital nomad:
+    - "digital nomad"
+    - "remote work"
+    - "long-stay tourism"
+
+  adventure tourism:
+    - "adventure tourism"
+    - "recreational tourism"
+    - "extreme sports"
+
+  wellness:
+    - "wellness tourism"
+    - "ayurvedic"
+    - "health tourism"
+
+  mice:
+    - "MICE"
+    - "meetings incentives conferences exhibitions"
+    - "business tourism"
+
+  wedding:
+    - "wedding tourism"
+    - "destination wedding"
+
+  agro:
+    - "agro tourism"
+    - "agricultural tourism"
+    - "farm stay"
+
+# Acronym expansions (always applied, no synonym lookup needed)
+acronyms:
+  TDL: "Tourism Development Levy"
+  SLTDA: "Sri Lanka Tourism Development Authority"
+  SLBFE: "Sri Lanka Bureau of Foreign Employment"
+  BOI: "Board of Investment"
+  VAT: "Value Added Tax"

@@ -1,0 +1,96 @@
+# SLTDA Downloads Page Section Mapping
+# Maps section_id → section metadata and document_type hints
+# Update this file if SLTDA restructures their downloads page.
+
+sections:
+  1:
+    name: "Registration & Renewal"
+    slug: "section_01_registration"
+    expected_doc_types: ["form", "checklist", "guideline"]
+    language_filter: true  # English only
+
+  2:
+    name: "Financial Concessions & Banking Circulars"
+    slug: "section_02_financial"
+    expected_doc_types: ["circular", "guideline"]
+    language_filter: true
+
+  3:
+    name: "Accommodation Services & Standards"
+    slug: "section_03_accommodation"
+    expected_doc_types: ["gazette", "guideline", "checklist"]
+    language_filter: true
+
+  4:
+    name: "Food & Beverage"
+    slug: "section_04_food_beverage"
+    expected_doc_types: ["gazette", "guideline"]
+    language_filter: true
+
+  5:
+    name: "Adventure & Recreational Tourism"
+    slug: "section_05_adventure"
+    expected_doc_types: ["gazette", "guideline"]
+    language_filter: true
+
+  6:
+    name: "Tourism Development Levy (TDL)"
+    slug: "section_06_tdl"
+    expected_doc_types: ["gazette", "form", "checklist", "circular"]
+    language_filter: true
+
+  7:
+    name: "Tour Guides & Operators"
+    slug: "section_07_tour_guides"
+    expected_doc_types: ["gazette", "form", "guideline"]
+    language_filter: true
+
+  8:
+    name: "Investment & Investor Unit"
+    slug: "section_08_investment"
+    expected_doc_types: ["form", "guideline"]
+    language_filter: true
+
+  9:
+    name: "Statistics & Arrivals Reports"
+    slug: "section_09_statistics"
+    expected_doc_types: ["report"]
+    language_filter: true
+
+  10:
+    name: "Annual Reports"
+    slug: "section_10_annual_reports"
+    expected_doc_types: ["report"]
+    language_filter: false  # annual reports available in all languages
+
+  11:
+    name: "Strategic Plans"
+    slug: "section_11_strategic_plan"
+    expected_doc_types: ["plan"]
+    language_filter: true
+
+  12:
+    name: "Niche Tourism Toolkits"
+    slug: "section_12_niche_toolkits"
+    expected_doc_types: ["toolkit"]
+    language_filter: true
+
+  13:
+    name: "Acts & Legislation"
+    slug: "section_13_acts"
+    expected_doc_types: ["act"]
+    language_filter: true
+
+# Language exclusion patterns in filenames
+language_exclusion_patterns:
+  - "_si"
+  - "_sinhala"
+  - "_sin"
+  - "_tamil"
+  - "_ta"
+  - "-sinhala"
+  - "-tamil"
+
+# Non-Latin threshold for content-level language rejection (0.0 – 1.0)
+non_latin_threshold: 0.30
+non_latin_check_chars: 500

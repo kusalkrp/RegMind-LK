@@ -1,0 +1,120 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sltda_mcp
+      POSTGRES_USER: sltda
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sltda -d sltda_mcp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  qdrant:
+    image: qdrant/qdrant:v1.9.2
+    restart: unless-stopped
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    ports:
+      - "6333:6333"    # exposed for local dev/validation only
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/6333' 2>/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  sltda-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    ports:
+      - "8001:8001"
+    environment:
+      POSTGRES_URL: postgresql+asyncpg://sltda:${POSTGRES_PASSWORD:-changeme}@postgres:5432/sltda_mcp
+      QDRANT_URL: http://qdrant:6333
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      MCP_MAX_CONCURRENCY: ${MCP_MAX_CONCURRENCY:-15}
+      MCP_TOOL_TIMEOUT_SECONDS: ${MCP_TOOL_TIMEOUT_SECONDS:-30}
+      RAG_TOP_K_CHUNKS: ${RAG_TOP_K_CHUNKS:-6}
+      RAG_SIMILARITY_THRESHOLD: ${RAG_SIMILARITY_THRESHOLD:-0.60}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DOCUMENTS_BASE_PATH: /app/documents
+    volumes:
+      - ./documents:/app/documents:ro
+    networks:
+      - internal
+    mem_limit: 1g
+    memswap_limit: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001/health')\" || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  ingestion:
+    build:
+      context: .
+      dockerfile: Dockerfile.ingestion
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    environment:
+      POSTGRES_URL: postgresql+asyncpg://sltda:${POSTGRES_PASSWORD:-changeme}@postgres:5432/sltda_mcp
+      QDRANT_URL: http://qdrant:6333
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      INGESTION_RATE_LIMIT_RPS: ${INGESTION_RATE_LIMIT_RPS:-1.0}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DOCUMENTS_BASE_PATH: /app/documents
+    volumes:
+      - ./documents:/app/documents
+      - ./ingestion/config:/app/ingestion/config:ro
+    networks:
+      - internal
+    profiles:
+      - ingestion
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+volumes:
+  postgres_data:
+  qdrant_storage:
+
+networks:
+  internal:
+    internal: true

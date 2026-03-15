@@ -1,0 +1,23 @@
+FROM python:3.11-slim
+
+RUN useradd --create-home --shell /bin/bash appuser
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    poppler-utils \
+    default-jre-headless \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY pyproject.toml .
+RUN pip install --no-cache-dir -e ".[dev]"
+
+COPY --chown=appuser:appuser src/ ./src/
+COPY --chown=appuser:appuser ingestion/ ./ingestion/
+
+USER appuser
+
+CMD ["python", "-m", "sltda_mcp.ingestion.pipeline"]
