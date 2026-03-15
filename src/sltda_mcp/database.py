@@ -14,16 +14,29 @@ _pool: asyncpg.Pool | None = None
 async def init_pool() -> None:
     global _pool
     settings = get_settings()
-    # asyncpg expects postgresql:// not postgresql+asyncpg://
     url = settings.postgres_url.replace("postgresql+asyncpg://", "postgresql://")
+
+    # Fail fast if default password is still in use
+    if "changeme" in url.lower():
+        raise RuntimeError(
+            "POSTGRES_PASSWORD is set to the default 'changeme'. "
+            "Set a strong password before starting the server."
+        )
+
     _pool = await asyncpg.create_pool(
         dsn=url,
-        min_size=5,
-        max_size=15,
+        min_size=settings.db_pool_min_size,
+        max_size=settings.db_pool_max_size,
         max_inactive_connection_lifetime=300,
         command_timeout=10,
+        statement_cache_size=settings.db_statement_cache_size,
     )
-    logger.info("PostgreSQL connection pool initialised (min=5, max=15)")
+    logger.info(
+        "PostgreSQL pool initialised (min=%d, max=%d, stmt_cache=%d)",
+        settings.db_pool_min_size,
+        settings.db_pool_max_size,
+        settings.db_statement_cache_size,
+    )
 
 
 async def close_pool() -> None:

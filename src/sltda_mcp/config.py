@@ -40,6 +40,18 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     refresh_notify_slack_webhook: str = ""
 
+    # Redis (optional — enables distributed rate limiting and caching)
+    redis_url: str = ""
+
+    # Database pool tuning
+    db_pool_min_size: int = 5
+    db_pool_max_size: int = 15
+    # Set to 0 when using PgBouncer in transaction mode
+    db_statement_cache_size: int = 100
+
+    # Rate limiting
+    rate_limit_per_caller_per_minute: int = 60
+
     # Storage
     documents_base_path: str = "./documents"
 
