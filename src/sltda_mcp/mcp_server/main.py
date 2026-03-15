@@ -23,9 +23,21 @@ from sltda_mcp.mcp_server.tools.registration import (
     get_registration_checklist,
     get_registration_requirements,
 )
+from sltda_mcp.mcp_server.tools.investor import (
+    get_investment_process,
+    search_sltda_resources,
+)
+from sltda_mcp.mcp_server.tools.niche import (
+    get_niche_categories,
+    get_niche_toolkit,
+)
 from sltda_mcp.mcp_server.tools.statistics import (
     get_annual_report,
     get_latest_arrivals_report,
+)
+from sltda_mcp.mcp_server.tools.strategy import (
+    get_strategic_plan,
+    get_tourism_act_provisions,
 )
 from sltda_mcp.qdrant_client import close_client, init_client, warmup_query
 
@@ -185,6 +197,87 @@ async def annual_report(
     For tourist arrival statistics only, use latest_arrivals_report.
     """
     return await get_annual_report(year, language)
+
+
+# ── Cluster 4 — Strategy & Policy ────────────────────────────────────────────
+
+@mcp.tool()
+async def strategic_plan(
+    query: str,
+    section_focus: str | None = None,
+) -> dict[str, Any]:
+    """
+    Get information from SLTDA's strategic plan using semantic search.
+    Call this for strategic goals, tourism targets, and policy direction.
+    For legal provisions of the Tourism Act, use tourism_act_provisions instead.
+    """
+    return await get_strategic_plan(query, section_focus)
+
+
+@mcp.tool()
+async def tourism_act_provisions(
+    topic: str,
+) -> dict[str, Any]:
+    """
+    Get relevant provisions from the Tourism Act No. 38 of 2005.
+    Call this for legal provisions, definitions, offences, and regulatory powers.
+    For policy goals, use strategic_plan instead.
+    """
+    return await get_tourism_act_provisions(topic)
+
+
+# ── Cluster 5 — Niche Tourism ────────────────────────────────────────────────
+
+@mcp.tool()
+async def niche_categories(
+    filter: str | None = None,
+) -> dict[str, Any]:
+    """
+    List all SLTDA-recognised niche tourism categories (eco, MICE, adventure, etc.).
+    Use this to discover available categories before drilling in with niche_toolkit.
+    """
+    return await get_niche_categories(filter)
+
+
+@mcp.tool()
+async def niche_toolkit(
+    category: str,
+    detail_level: Literal["summary", "full"] = "summary",
+) -> dict[str, Any]:
+    """
+    Get information about a specific niche tourism toolkit.
+    Summary mode: fast DB lookup. Full mode: DB + AI-synthesised document detail.
+    Use niche_categories first to find the correct category code.
+    """
+    return await get_niche_toolkit(category, detail_level)
+
+
+# ── Cluster 6 — Investor & Discovery ─────────────────────────────────────────
+
+@mcp.tool()
+async def investment_process(
+    project_type: str | None = None,
+) -> dict[str, Any]:
+    """
+    Get the investment process for starting a tourism business in Sri Lanka.
+    Call this when an investor asks how to establish or get approval for a tourism project.
+    """
+    return await get_investment_process(project_type)
+
+
+@mcp.tool()
+async def search_resources(
+    query: str,
+    section_filter: str | None = None,
+    document_type_filter: str | None = None,
+    top_k: int = 5,
+) -> dict[str, Any]:
+    """
+    General-purpose semantic search across all SLTDA documents.
+    Use specific tools when intent is clear — they are faster and more accurate.
+    Top_k is capped at 7.
+    """
+    return await search_sltda_resources(query, section_filter, document_type_filter, top_k)
 
 
 # ── Health (non-MCP HTTP endpoint) ────────────────────────────────────────────
