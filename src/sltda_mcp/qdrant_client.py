@@ -9,6 +9,7 @@ from uuid import UUID
 
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models as qdrant_models
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from sltda_mcp.config import get_settings
 from sltda_mcp.exceptions import QdrantError
@@ -106,6 +107,12 @@ async def upsert_points(
         raise QdrantError(f"Upsert failed for collection '{collection_name}': {exc}") from exc
 
 
+@retry(
+    retry=retry_if_exception_type(QdrantError),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    reraise=True,
+)
 async def search(
     collection_name: str,
     query_vector: list[float],
@@ -113,7 +120,7 @@ async def search(
     score_threshold: float,
     query_filter: qdrant_models.Filter | None = None,
 ) -> list[qdrant_models.ScoredPoint]:
-    """Semantic search against a Qdrant collection."""
+    """Semantic search with automatic retry on transient failures."""
     client = get_client()
     try:
         results = await client.search(
