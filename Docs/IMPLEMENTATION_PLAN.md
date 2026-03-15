@@ -1751,19 +1751,19 @@ The project is production-ready when ALL of the following are true:
 
 Update task checkboxes as phases are completed. This file is the single source of truth for implementation status.
 
-| Phase | Status | Completion Date |
-|-------|--------|-----------------|
-| Phase 0 — Bootstrap | ✅ Complete | 2026-03-10 |
-| Phase 1 — Infrastructure | ✅ Complete | 2026-03-10 |
-| Phase 2 — Acquisition | ✅ Complete | 2026-03-10 |
-| Phase 3 — Intelligence Pipeline | ✅ Complete | 2026-03-10 |
-| Phase 4 — Chunking & Embedding | ✅ Complete | 2026-03-10 |
-| Phase 5 — PG Structured Data | ✅ Complete | 2026-03-15 |
-| Phase 6 — Orchestrator & Cutover | ✅ Complete | 2026-03-15 |
-| Phase 7 — Structured MCP Tools | ✅ Complete | 2026-03-15 |
-| Phase 8 — RAG Tools | ✅ Complete | 2026-03-15 |
-| Phase 9 — Observability | ✅ Complete | 2026-03-15 |
-| Phase 10 — Full Test Suite | ✅ Complete | 2026-03-15 |
-| Phase 11 — Production Hardening | ✅ Complete | 2026-03-15 |
-| Phase 12 — Demo & Integration | ✅ Complete | 2026-03-15 |
-| Phase 13 — Documentation | ✅ Complete | 2026-03-15 |
+| Phase | Status |
+|-------|--------|
+| Phase 0 — Bootstrap | ✅ Complete | 
+| Phase 1 — Infrastructure | ✅ Complete | 
+| Phase 2 — Acquisition | ✅ Complete | 
+| Phase 3 — Intelligence Pipeline | ✅ Complete | 
+| Phase 4 — Chunking & Embedding | ✅ Complete | 
+| Phase 5 — PG Structured Data | ✅ Complete |
+| Phase 6 — Orchestrator & Cutover | ✅ Complete |
+| Phase 7 — Structured MCP Tools | ✅ Complete |
+| Phase 8 — RAG Tools | ✅ Complete |
+| Phase 9 — Observability | ✅ Complete |
+| Phase 10 — Full Test Suite | ✅ Complete |
+| Phase 11 — Production Hardening | ✅ Complete |
+| Phase 12 — Demo & Integration | ✅ Complete |
+| Phase 13 — Documentation | ✅ Complete |
