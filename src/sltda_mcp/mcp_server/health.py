@@ -33,8 +33,6 @@ _POOL_FREE_THRESHOLD = 0.20
 _DISK_WARN_THRESHOLD = 80.0
 _INCOMPLETE_CUTOVER_STATES = {"qdrant_done", "postgres_done"}
 
-# Tracks the last status we sent to Slack so we only alert on transitions.
-_last_notified_status: str = "healthy"
 
 
 async def health_check() -> dict:
@@ -177,13 +175,30 @@ async def health_check() -> dict:
         except Exception:
             invocation_stats = {"error": "stats_unavailable"}
 
-    # ── Slack alert on status transition ─────────────────────────────────────
-    global _last_notified_status
-    if overall != "healthy" and overall != _last_notified_status:
-        _last_notified_status = overall
-        asyncio.create_task(notify_health_changed(overall, components))
-    elif overall == "healthy" and _last_notified_status != "healthy":
-        _last_notified_status = "healthy"  # reset guard silently when recovered
+    # -- Slack alert on status transition (DB-backed, safe for multi-instance) ---
+    if pg_ok and overall != "healthy":
+        try:
+            async with acquire() as conn:
+                last_alerted = await conn.fetchval(
+                    "SELECT last_slack_alert_status FROM system_metadata LIMIT 1"
+                ) or "healthy"
+                if overall != last_alerted:
+                    await conn.execute(
+                        "UPDATE system_metadata SET last_slack_alert_status = $1",
+                        overall,
+                    )
+                    asyncio.create_task(notify_health_changed(overall, components))
+        except Exception:
+            pass  # non-critical
+    elif pg_ok and overall == "healthy":
+        try:
+            async with acquire() as conn:
+                await conn.execute(
+                    "UPDATE system_metadata SET last_slack_alert_status = 'healthy' "
+                    "WHERE last_slack_alert_status != 'healthy'"
+                )
+        except Exception:
+            pass
 
     # ── Assemble response ─────────────────────────────────────────────────────
     uptime = int(time.monotonic() - _START_TIME)
