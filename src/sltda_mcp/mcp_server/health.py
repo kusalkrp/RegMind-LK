@@ -11,6 +11,7 @@ Status rules:
 Issue #19 mitigation: disk_usage_percent included; > 80% → degraded.
 """
 
+import asyncio
 import logging
 import os
 import shutil
@@ -21,6 +22,7 @@ import google.generativeai as genai
 
 from sltda_mcp.config import get_settings
 from sltda_mcp.database import acquire, pool_stats
+from sltda_mcp.notifications import notify_health_changed
 from sltda_mcp.qdrant_client import get_client
 
 logger = logging.getLogger(__name__)
@@ -30,6 +32,9 @@ _START_TIME = time.monotonic()
 _POOL_FREE_THRESHOLD = 0.20
 _DISK_WARN_THRESHOLD = 80.0
 _INCOMPLETE_CUTOVER_STATES = {"qdrant_done", "postgres_done"}
+
+# Tracks the last status we sent to Slack so we only alert on transitions.
+_last_notified_status: str = "healthy"
 
 
 async def health_check() -> dict:
@@ -171,6 +176,14 @@ async def health_check() -> dict:
             }
         except Exception:
             invocation_stats = {"error": "stats_unavailable"}
+
+    # ── Slack alert on status transition ─────────────────────────────────────
+    global _last_notified_status
+    if overall != "healthy" and overall != _last_notified_status:
+        _last_notified_status = overall
+        asyncio.create_task(notify_health_changed(overall, components))
+    elif overall == "healthy" and _last_notified_status != "healthy":
+        _last_notified_status = "healthy"  # reset guard silently when recovered
 
     # ── Assemble response ─────────────────────────────────────────────────────
     uptime = int(time.monotonic() - _START_TIME)

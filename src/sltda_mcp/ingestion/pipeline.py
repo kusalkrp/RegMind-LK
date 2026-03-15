@@ -17,6 +17,7 @@ from qdrant_client import QdrantClient
 from sltda_mcp.config import get_settings
 from sltda_mcp.database import acquire, init_pool
 from sltda_mcp.exceptions import CutoverError, IngestionError
+from sltda_mcp.notifications import notify_ingestion_complete, notify_ingestion_failed
 from sltda_mcp.ingestion.change_detector import ChangeType, detect_changes, write_manifest
 from sltda_mcp.ingestion.chunker import chunk_document
 from sltda_mcp.ingestion.cutover import execute_cutover
@@ -277,7 +278,9 @@ async def run_pipeline(dry_run: bool = False) -> dict[str, Any]:
                 f"{_ABORT_THRESHOLD:.0%} threshold"
             )
             await _update_pipeline_state(conn, run_id, 4, "aborted", msg)
-            raise IngestionError(msg)
+            exc = IngestionError(msg)
+            await notify_ingestion_failed(exc, run_id)
+            raise exc
 
         await _update_pipeline_state(
             conn, run_id, 4, "done",
@@ -310,7 +313,9 @@ async def run_pipeline(dry_run: bool = False) -> dict[str, Any]:
                     f"(expected ~{expected}, got {actual})"
                 )
                 await _update_pipeline_state(conn, run_id, 9, "aborted", msg)
-                raise IngestionError(msg)
+                exc = IngestionError(msg)
+                await notify_ingestion_failed(exc, run_id)
+                raise exc
 
         await _update_pipeline_state(conn, run_id, 9, "done", f"{actual} points in staging")
 
@@ -320,7 +325,9 @@ async def run_pipeline(dry_run: bool = False) -> dict[str, Any]:
         if failures:
             msg = f"Smoke tests failed: {'; '.join(failures)}"
             await _update_pipeline_state(conn, run_id, 11, "aborted", msg)
-            raise IngestionError(msg)
+            exc = IngestionError(msg)
+            await notify_ingestion_failed(exc, run_id)
+            raise exc
         await _update_pipeline_state(conn, run_id, 11, "done", "all smoke tests passed")
 
         # ── Step 12: Cutover ──────────────────────────────────────────────────
@@ -333,6 +340,7 @@ async def run_pipeline(dry_run: bool = False) -> dict[str, Any]:
                 await execute_cutover(conn)
             except CutoverError as exc:
                 await _update_pipeline_state(conn, run_id, 12, "aborted", str(exc))
+                await notify_ingestion_failed(exc, run_id)
                 raise
             await _update_pipeline_state(conn, run_id, 12, "done")
 
@@ -352,6 +360,7 @@ async def run_pipeline(dry_run: bool = False) -> dict[str, Any]:
             "dry_run": dry_run,
         }
         logger.info("Pipeline run %s complete: %s", run_id, summary)
+        await notify_ingestion_complete(summary)
         return summary
 
 
